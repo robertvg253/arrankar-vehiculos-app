@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ActionData } from "~/routes/productos.nuevo";
 import type { FetcherWithComponents } from "@remix-run/react";
-import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
+//import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 
 // Tipos para las imágenes
 type ExistingImage = {
@@ -127,25 +127,6 @@ export default function ProductForm({ onClose, defaultValues, fetcher }: Product
         order_index: index + 1
       }
     }));
-  };
-
-  // Función para manejar el fin del drag and drop
-  const onDragEnd = (result: DropResult) => {
-    if (!result.destination) return;
-
-    const reordered = reorder(
-      orderedImages,
-      result.source.index,
-      result.destination.index
-    );
-
-    console.log('Imágenes reordenadas:', reordered.map(img => ({
-      id: img.id,
-      order_index: img.order_index,
-      type: img.type
-    })));
-
-    setOrderedImages(reordered);
   };
 
   // Función para eliminar una imagen
@@ -372,51 +353,32 @@ export default function ProductForm({ onClose, defaultValues, fetcher }: Product
             <h4 className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
               Imágenes ({orderedImages.length} en total)
             </h4>
-            <DragDropContext onDragEnd={onDragEnd}>
-              <Droppable droppableId="image-list" direction="horizontal">
-                {(provided) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    className="grid grid-cols-4 gap-4"
+            <div className="grid grid-cols-4 gap-4">
+              {orderedImages.map((image, index) => (
+                <div
+                  key={image.id}
+                  className={`relative aspect-square overflow-hidden rounded-lg border transition-all duration-200
+                    border-gray-200 cursor-default hover:border-blue-300 dark:border-gray-700
+                    ${image.type === 'new' ? 'border-dashed border-blue-400' : ''}`}
+                >
+                  <img
+                    src={image.url}
+                    alt="Imagen del producto"
+                    className="h-full w-full object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveImage(image.id)}
+                    className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 text-xs transition-colors duration-200"
+                    aria-label="Eliminar imagen"
                   >
-                    {orderedImages.map((image, index) => (
-                      <Draggable key={image.id} draggableId={image.id} index={index}>
-                        {(provided, snapshot) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.draggableProps}
-                            {...provided.dragHandleProps}
-                            className={`relative aspect-square overflow-hidden rounded-lg border transition-all duration-200
-                                     ${snapshot.isDragging 
-                                       ? 'border-blue-500 shadow-lg opacity-100 cursor-grabbing scale-105 z-50' 
-                                       : 'border-gray-200 cursor-grab hover:border-blue-300 dark:border-gray-700'}
-                                     ${image.type === 'new' ? 'border-dashed border-blue-400' : ''}`}
-                          >
-                            <img
-                              src={image.url}
-                              alt="Imagen del producto"
-                              className="h-full w-full object-cover"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveImage(image.id)}
-                              className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 text-xs transition-colors duration-200"
-                              aria-label="Eliminar imagen"
-                            >
-                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"></path>
-                              </svg>
-                            </button>
-                          </div>
-                        )}
-                      </Draggable>
-                    ))}
-                    {provided.placeholder}
-                  </div>
-                )}
-              </Droppable>
-            </DragDropContext>
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"></path>
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

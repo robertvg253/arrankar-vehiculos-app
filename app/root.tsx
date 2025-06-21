@@ -4,6 +4,7 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  LiveReload,
 } from "@remix-run/react";
 import type { LinksFunction } from "@remix-run/node";
 import Sidebar from "./components/Sidebar";
@@ -19,23 +20,29 @@ export const links: LinksFunction = () => [
   },
   {
     rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
+    href: "https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap",
+  },
+  {
+    rel: "icon",
+    href: "/images/favicon.ico",
+    type: "image/x-icon",
   },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="h-full">
+    <html lang="es" className="h-full font-sans" style={{ fontFamily: 'Poppins, sans-serif' }}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
       </head>
-      <body className="h-full">
+      <body className="h-full bg-brand-bg text-brand-text font-sans" style={{ fontFamily: 'Poppins, sans-serif' }}>
         {children}
         <ScrollRestoration />
         <Scripts />
+        <LiveReload />
       </body>
     </html>
   );
@@ -44,9 +51,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <Layout>
-      <div className="flex h-full">
+      <div className="flex h-full font-sans">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto bg-gray-50 p-4 pt-16 dark:bg-gray-950 lg:p-8 lg:pt-8">
+        <main className="flex-1 overflow-y-auto bg-brand-bg p-4 pt-16 lg:p-8 lg:pt-8">
           <Outlet />
         </main>
       </div>
