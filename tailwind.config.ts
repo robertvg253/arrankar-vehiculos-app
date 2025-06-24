@@ -11,6 +11,8 @@ export default {
         'brand-title': '#0d0d0d',
         'brand-highlight': '#25bccd',
         'brand-text': '#333',
+        'background-light-gray': '#f1f1f1',
+        'sidebar-bg': '#EBEBEB',
       },
       fontFamily: {
         sans: [

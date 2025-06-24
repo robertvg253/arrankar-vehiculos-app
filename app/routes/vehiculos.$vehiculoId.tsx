@@ -3,6 +3,7 @@ import { useLoaderData, Link, Form, useActionData, useNavigation } from "@remix-
 import type { LoaderFunction, ActionFunction } from "@remix-run/node";
 import { supabase } from "~/utils/supabase.server";
 import { useState, useEffect } from "react";
+import ImageGallery, { type ImageGalleryImage } from "~/components/ImageGallery";
 
 type Vehiculo = {
   uuid: string;
@@ -66,7 +67,23 @@ export const loader: LoaderFunction = async ({ params }) => {
     );
   }
 
-  return json({ vehiculo });
+  // Obtener imágenes asociadas desde la nueva tabla 'images'
+  const { data: imagesData, error: imagesError } = await supabase
+    .from("images")
+    .select("id, url, storage_id, order_index, destacada")
+    .eq("vehicle_id", vehiculoId)
+
+  if (imagesError) {
+    console.error("Error al cargar imágenes:", imagesError);
+    // Devuelve el vehículo pero con un array de imágenes vacío en caso de error
+    return json({ vehiculo, images: [] });
+  }
+
+  // Ordenar imágenes por 'order_index' numéricamente
+  const images: ImageGalleryImage[] = (imagesData || [])
+    .sort((a, b) => parseInt(a.order_index, 10) - parseInt(b.order_index, 10));
+
+  return json({ vehiculo, images });
 };
 
 export const action: ActionFunction = async ({ request, params }) => {
@@ -247,7 +264,7 @@ function DeleteModal({
 }
 
 export default function VehiculoDetallePage() {
-  const { vehiculo, message } = useLoaderData<{ vehiculo?: Vehiculo; message?: string }>();
+  const { vehiculo, message, images = [] } = useLoaderData<{ vehiculo?: Vehiculo; message?: string; images?: ImageGalleryImage[] }>();
   const actionData = useActionData<ActionData>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
@@ -312,7 +329,7 @@ export default function VehiculoDetallePage() {
   const vehiculoInfo = `${vehiculo.marca || ''} ${vehiculo.modelo || ''}`.trim() || 'Sin información';
 
   return (
-    <div className="container mx-auto px-4 py-8 font-sans bg-brand-bg min-h-screen">
+    <div className="container mx-auto px-4 py-8 font-sans bg-brand-bg min-h-screen rounded-[15px]">
       {/* Header con navegación */}
       <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
@@ -346,22 +363,8 @@ export default function VehiculoDetallePage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Columna principal - Imagen */}
         <div className="lg:col-span-2">
-          {/* Imagen principal */}
-          <div className="bg-white rounded-xl border border-brand-secondary shadow-md overflow-hidden">
-            {vehiculo.url_img ? (
-              <img 
-                src={vehiculo.url_img} 
-                alt={`${vehiculo.marca || 'Vehículo'} ${vehiculo.modelo || ''}`} 
-                className="w-full h-96 object-cover" 
-              />
-            ) : (
-              <div className="w-full h-96 flex items-center justify-center bg-brand-bg text-brand-highlight">
-                <svg className="w-16 h-16 opacity-50" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-                </svg>
-              </div>
-            )}
-          </div>
+          {/* Galería de imágenes */}
+          <ImageGallery images={images} />
         </div>
 
         {/* Sidebar - Resumen y acciones */}

@@ -9,7 +9,7 @@ import {
 } from "@remix-run/node";
 import { useLoaderData, useFetcher, useSubmit, useActionData, useNavigate } from "@remix-run/react";
 import { supabase } from "~/utils/supabase.server";
-import ImageUploader, { type ImageUploaderChanges } from "../components/ImageUploader";
+import ImageUploader, { type ImageUploaderChanges, type ImageMetadata } from "../components/ImageUploader";
 import LoadingToast from "../components/LoadingToast";
 
 // Cache simple en memoria para datos que no cambian frecuentemente
@@ -243,8 +243,8 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     // Extraer datos de imágenes
-    const orderedImagesMetadata = JSON.parse(formData.get("orderedImagesMetadata") as string || "[]");
-    const imageIdsToDelete = JSON.parse(formData.get("imageIdsToDelete") as string || "[]");
+    const orderedImagesMetadata: ImageMetadata[] = JSON.parse(formData.get("orderedImagesMetadata") as string || "[]");
+    const imageIdsToDelete: {id: string, storage_id: string}[] = JSON.parse(formData.get("imageIdsToDelete") as string || "[]");
 
     console.log("=== DEBUG IMÁGENES ===");
     console.log("orderedImagesMetadata:", orderedImagesMetadata);
@@ -284,17 +284,17 @@ export async function action({ request }: ActionFunctionArgs) {
 
     // 2. Procesar imágenes nuevas
     const imageUploadPromises = orderedImagesMetadata
-      .filter((meta: any) => meta.isNew)
-      .map(async (meta: any) => {
+      .filter((meta) => meta.isNew)
+      .map(async (meta) => {
         console.log("Procesando imagen nueva:", meta);
-        const file = formData.get(meta.id) as File;
+        const file = formData.get(meta.storage_id) as File;
         console.log("Archivo encontrado:", file ? "SÍ" : "NO", file?.name);
         if (!file || !(file instanceof File)) {
           console.log("Archivo inválido, saltando...");
           return;
         }
 
-        const filePath = `${vehicleId}/${meta.id}-${file.name}`;
+        const filePath = `${vehicleId}/${meta.storage_id}`; // Usar solo vehicleId y storage_id para la ruta
         console.log("Subiendo a path:", filePath);
         
         // Verificar que el bucket existe antes de subir
@@ -326,11 +326,13 @@ export async function action({ request }: ActionFunctionArgs) {
         const { data: urlData } = supabase.storage.from('imagen-vehiculo').getPublicUrl(filePath);
         console.log("URL pública generada:", urlData.publicUrl);
 
-        const insertResult = await supabase.from('image').insert({
+        const insertResult = await supabase.from('images').insert({
           vehicle_id: vehicleUuid,
           url: urlData.publicUrl,
-          order_index: meta.order_index,
-          uuid: meta.id,
+          order_index: String(meta.order_index),
+          storage_id: meta.storage_id,
+          destacada: meta.destacada ? 'true' : 'false',
+          id_v: String(vehicleId),
         });
 
         if (insertResult.error) {
@@ -342,41 +344,37 @@ export async function action({ request }: ActionFunctionArgs) {
         return insertResult;
       });
 
-    // 3. Actualizar orden de imágenes existentes
+    // 3. Actualizar orden y estado 'destacada' de imágenes existentes
     const updateOrderPromises = orderedImagesMetadata
-      .filter((meta: any) => !meta.isNew)
-      .map(async (meta: any) => {
+      .filter((meta) => !meta.isNew)
+      .map(async (meta) => {
         return supabase
-          .from('image')
-          .update({ order_index: meta.order_index })
-          .eq('uuid', meta.id);
+          .from('images')
+          .update({ 
+            order_index: String(meta.order_index),
+            destacada: meta.destacada ? 'true' : 'false'
+          })
+          .eq('id', meta.id);
       });
 
     // 4. Eliminar imágenes marcadas
-    const deletePromises = imageIdsToDelete.map(async (imageId: string) => {
-      // Primero obtener la URL para eliminar del storage
-      const { data: imageData } = await supabase
-        .from('image')
-        .select('url')
-        .eq('id', imageId)
-        .single();
-
-      if (imageData?.url) {
-        // Extraer el path del storage de la URL
-        const urlParts = imageData.url.split('/');
-        const storagePath = urlParts.slice(-2).join('/'); // vehicleId/filename
-        
-        // Eliminar del storage
-        await supabase.storage
-          .from('imagen-vehiculo')
-          .remove([storagePath]);
-      }
+    const deletePromises = imageIdsToDelete.map(async (imageToDelete) => {
+      // La ruta en storage se reconstruye con el id de vehículo y el storage_id de la imagen
+      // Nota: Asumimos que el vehicleId (int) está disponible. 
+      // En un formulario de EDICIÓN real, este ID debería ser parte del formulario o cargado.
+      // Para 'nuevo', esta lógica no debería ejecutarse, pero la refactorizamos como se pidió.
+      const storagePath = `${vehicleId}/${imageToDelete.storage_id}`;
+      
+      // Eliminar del storage
+      await supabase.storage
+        .from('imagen-vehiculo')
+        .remove([storagePath]);
 
       // Eliminar de la base de datos
       return supabase
-        .from('image')
+        .from('images')
         .delete()
-        .eq('id', imageId);
+        .eq('id', imageToDelete.id);
     });
 
     // Ejecutar todas las operaciones de imágenes en paralelo
@@ -386,6 +384,45 @@ export async function action({ request }: ActionFunctionArgs) {
       ...deletePromises
     ]);
 
+    // 5. Actualizar url_img en vehiculos con la imagen destacada
+    console.log("[vehiculos.nuevo.tsx - action] Buscando imagen destacada para actualizar url_img...");
+    
+    // Buscar la imagen destacada entre las imágenes procesadas
+    const featuredImage = orderedImagesMetadata.find(meta => meta.destacada === true);
+    
+    if (featuredImage) {
+      let featuredImageUrl: string;
+      
+      if (featuredImage.isNew) {
+        // Para imágenes nuevas, construir la URL pública
+        const filePath = `${vehicleId}/${featuredImage.storage_id}`;
+        const { data: urlData } = supabase.storage.from('imagen-vehiculo').getPublicUrl(filePath);
+        featuredImageUrl = urlData.publicUrl;
+      } else {
+        // Para imágenes existentes, usar la URL almacenada
+        featuredImageUrl = featuredImage.url || '';
+      }
+      
+      if (featuredImageUrl) {
+        console.log(`[vehiculos.nuevo.tsx - action] Actualizando url_img con: ${featuredImageUrl}`);
+        
+        const { error: updateUrlError } = await supabase
+          .from('vehiculos')
+          .update({ url_img: featuredImageUrl })
+          .eq('uuid', vehicleUuid);
+          
+        if (updateUrlError) {
+          console.error("[vehiculos.nuevo.tsx - action] Error actualizando url_img:", updateUrlError);
+          // No lanzar error aquí para no fallar toda la operación
+        } else {
+          console.log("[vehiculos.nuevo.tsx - action] url_img actualizada exitosamente");
+        }
+      }
+    } else {
+      console.log("[vehiculos.nuevo.tsx - action] No se encontró imagen destacada, url_img permanece sin cambios");
+    }
+
+    console.log("[vehiculos.nuevo.tsx - action] Action finished successfully, redirecting...");
     return redirect('/vehiculos');
 
   } catch (error: any) {
@@ -531,8 +568,8 @@ export default function NuevoVehiculo() {
     formData.append("orderedImagesMetadata", JSON.stringify(imageUploaderData.orderedImagesMetadata));
     formData.append("imageIdsToDelete", JSON.stringify(imageUploaderData.imageIdsToDelete));
 
-    for (const [id, file] of imageUploaderData.filesToUpload.entries()) {
-      formData.append(id, file);
+    for (const [storage_id, file] of imageUploaderData.filesToUpload.entries()) {
+      formData.append(storage_id, file);
     }
     
     submit(formData, { method: "post", encType: "multipart/form-data", replace: true });

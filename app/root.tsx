@@ -38,7 +38,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Meta />
         <Links />
       </head>
-      <body className="h-full bg-brand-bg text-brand-text font-sans" style={{ fontFamily: 'Poppins, sans-serif' }}>
+      <body className="h-full bg-background-light-gray text-brand-text font-sans" style={{ fontFamily: 'Poppins, sans-serif' }}>
         {children}
         <ScrollRestoration />
         <Scripts />
@@ -53,7 +53,7 @@ export default function App() {
     <Layout>
       <div className="flex h-full font-sans">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto bg-brand-bg p-4 pt-16 lg:p-8 lg:pt-8">
+        <main className="flex-1 overflow-y-auto bg-background-light-gray p-4 pt-16 lg:p-8 lg:pt-8">
           <Outlet />
         </main>
       </div>

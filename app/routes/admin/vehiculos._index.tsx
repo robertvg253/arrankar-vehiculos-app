@@ -99,7 +99,7 @@ export default function VehiculosPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 font-sans bg-brand-bg min-h-screen overflow-y-auto rounded-[15px]">
+    <div className="container mx-auto px-4 py-8 font-sans bg-brand-bg min-h-screen overflow-y-auto">
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-brand-title">
@@ -158,83 +158,47 @@ export default function VehiculosPage() {
         </div>
       ) : vehiculos.length > 0 ? (
         <>
-          {/* Lista de vehículos con columnas alineadas verticalmente en desktop y agrupadas en mobile */}
-          <div className="w-full max-w-full">
-            {/* Encabezados solo en desktop */}
-            <div className="hidden md:grid grid-cols-[60px_2fr_1.2fr_1fr_auto] gap-4 px-4 pb-2 text-xs text-brand-text font-semibold uppercase">
-              <div>Foto</div>
-              <div>Vehículo</div>
-              <div>Detalles</div>
-              <div className="text-right">Precio</div>
-              <div></div>
-            </div>
-            <div className="space-y-4 w-full max-w-full">
-              {vehiculos.map((vehiculo) => (
-                <div
-                  key={vehiculo.uuid}
-                  className="bg-white shadow-sm hover:shadow-md transition rounded-lg w-full max-w-full overflow-x-auto px-2 md:px-4 py-3 grid grid-cols-1 md:grid-cols-[60px_2fr_1.2fr_1fr_auto] md:gap-4 items-center"
-                  style={{ minHeight: 64 }}
-                >
-                  {/* Mobile: imagen y título alineados horizontalmente */}
-                  <div className="block md:hidden w-full">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={vehiculo.url_img || '/images/placeholder.png'}
-                        alt={`${vehiculo.marca || 'Vehículo'} ${vehiculo.modelo || ''}`}
-                        className="w-12 h-12 object-cover rounded border border-brand-secondary bg-brand-bg flex-shrink-0"
-                      />
-                      <span className="font-bold text-brand-title text-base leading-tight truncate">
-                        {vehiculo.marca || '-'} {vehiculo.modelo || ''}
-                      </span>
-                    </div>
-                    {vehiculo.version && (
-                      <span className="block text-xs text-brand-text truncate mt-1 ml-14">{vehiculo.version}</span>
-                    )}
-                    <div className="flex flex-row gap-4 mt-2 text-xs text-brand-text ml-14">
-                      <span><span className="font-semibold">Año:</span> {vehiculo.anio || '-'}</span>
-                      <span><span className="font-semibold">Km:</span> {vehiculo.km !== null ? formatMileage(vehiculo.km) : '-'}</span>
-                      <span><span className="font-semibold">Comb.:</span> {vehiculo.combustible || '-'}</span>
-                    </div>
+          {/* Lista vertical de vehículos */}
+          <div className="divide-y divide-brand-secondary rounded-xl bg-white shadow-md">
+            {vehiculos.map((vehiculo) => (
+              <div
+                key={vehiculo.uuid}
+                className="flex items-center gap-4 p-4 hover:bg-brand-secondary transition cursor-pointer"
+                onClick={() => navigate(`/vehiculos/${vehiculo.uuid}`)}
+              >
+                {/* Imagen pequeña */}
+                <img
+                  src={vehiculo.url_img || '/images/placeholder.png'}
+                  alt={`${vehiculo.marca || 'Vehículo'} ${vehiculo.modelo || ''}`}
+                  className="w-12 h-12 object-cover rounded border border-brand-secondary bg-brand-bg flex-shrink-0"
+                />
+                {/* Info principal */}
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-brand-title truncate">
+                    {vehiculo.marca || '-'} {vehiculo.modelo || ''} {vehiculo.anio ? `(${vehiculo.anio})` : ''}
                   </div>
-                  {/* Desktop: imagen, título, detalles, precio, botón */}
-                  <div className="hidden md:flex justify-center md:justify-start items-center">
-                    <img
-                      src={vehiculo.url_img || '/images/placeholder.png'}
-                      alt={`${vehiculo.marca || 'Vehículo'} ${vehiculo.modelo || ''}`}
-                      className="w-12 h-12 object-cover rounded border border-brand-secondary bg-brand-bg flex-shrink-0"
-                    />
-                  </div>
-                  <div className="hidden md:flex flex-col md:justify-center min-w-0">
-                    <span className="font-bold text-brand-title text-lg leading-tight truncate">
-                      {vehiculo.marca || '-'} {vehiculo.modelo || ''}
-                    </span>
-                    {vehiculo.version && (
-                      <span className="text-xs text-brand-text truncate mt-0.5">{vehiculo.version}</span>
-                    )}
-                  </div>
-                  <div className="hidden md:flex flex-col min-w-0 text-xs text-brand-text">
-                    <span><span className="font-semibold">Año:</span> {vehiculo.anio || '-'}</span>
-                    <span><span className="font-semibold">Km:</span> {vehiculo.km !== null ? formatMileage(vehiculo.km) : '-'}</span>
-                    <span><span className="font-semibold">Combustible:</span> {vehiculo.combustible || '-'}</span>
-                  </div>
-                  <div className="flex flex-col items-end md:items-center min-w-[90px]">
-                    <span className="text-brand-primary font-bold text-lg md:text-xl">{formatPrice(vehiculo.precio)}</span>
-                  </div>
-                  <div className="flex justify-end">
-                    <button
-                      type="button"
-                      className="px-4 py-2 bg-brand-primary text-brand-title rounded-md font-medium text-sm shadow-sm hover:bg-brand-highlight transition flex-shrink-0 w-full md:w-auto"
-                      onClick={e => {
-                        e.stopPropagation();
-                        navigate(`/vehiculos/${vehiculo.uuid}`);
-                      }}
-                    >
-                      Editar
-                    </button>
+                  {vehiculo.version && (
+                    <div className="text-xs text-brand-text truncate">{vehiculo.version}</div>
+                  )}
+                  <div className="text-sm text-brand-text truncate">
+                    {formatPrice(vehiculo.precio)}
+                    {vehiculo.combustible ? ` • ${vehiculo.combustible}` : ''}
+                    {vehiculo.km !== null ? ` • ${formatMileage(vehiculo.km)}` : ''}
                   </div>
                 </div>
-              ))}
-            </div>
+                {/* Botón Editar */}
+                <button
+                  type="button"
+                  className="ml-4 px-4 py-2 bg-brand-primary text-brand-title rounded-md font-medium text-sm shadow-sm hover:bg-brand-highlight transition"
+                  onClick={e => {
+                    e.stopPropagation();
+                    navigate(`/vehiculos/${vehiculo.uuid}`);
+                  }}
+                >
+                  Editar
+                </button>
+              </div>
+            ))}
           </div>
         </>
       ) : (
