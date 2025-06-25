@@ -65,6 +65,32 @@ async function getAniosPorModelo(marca: string, modelo: string): Promise<string[
   return uniqueValues;
 }
 
+// Nueva función para obtener combustibles únicos
+async function getCombustiblesUnicos(): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("vehiculos")
+    .select("combustible")
+    .not("combustible", 'is', null)
+    .not("combustible", 'eq', '')
+    .order('combustible');
+  if (error) throw error;
+  const uniqueValues = Array.from(new Set(data.map(row => row.combustible).filter(Boolean)));
+  return uniqueValues.sort();
+}
+
+// Nueva función para obtener transmisiones únicas
+async function getTransmisionesUnicas(): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("vehiculos")
+    .select("transmision")
+    .not("transmision", 'is', null)
+    .not("transmision", 'eq', '')
+    .order('transmision');
+  if (error) throw error;
+  const uniqueValues = Array.from(new Set(data.map(row => row.transmision).filter(Boolean)));
+  return uniqueValues.sort();
+}
+
 // --- Tipos ---
 
 export type VehiculoType = {
@@ -81,12 +107,18 @@ export type VehiculoType = {
 type LoaderData = {
   vehiculos: VehiculoType[];
   marcas: string[];
+  combustibles: string[];
+  transmisiones: string[];
   filtrosActivos: {
     marca: string | null;
     modelo: string | null;
     anio: string | null;
     precioMin: string | null;
     precioMax: string | null;
+    kmMin: string | null;
+    kmMax: string | null;
+    combustible: string | null;
+    transmision: string | null;
   };
   error?: string;
   totalVehiculos: number;
@@ -94,6 +126,8 @@ type LoaderData = {
   offset: number;
   overallMinPrice: number;
   overallMaxPrice: number;
+  overallMinKm: number;
+  overallMaxKm: number;
 };
 
 type OptionsLoaderData = {
@@ -118,6 +152,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const anio = searchParams.get("anio");
   const precioMin = searchParams.get("precioMin");
   const precioMax = searchParams.get("precioMax");
+  const kmMin = searchParams.get("kmMin");
+  const kmMax = searchParams.get("kmMax");
+  const combustible = searchParams.get("combustible");
+  const transmision = searchParams.get("transmision");
+  const sortBy = searchParams.get("sortBy");
+  const sortOrder = searchParams.get("sortOrder");
 
   // Endpoint para opciones de filtro dinámicas
   try {
@@ -139,10 +179,21 @@ export async function loader({ request }: LoaderFunctionArgs) {
   try {
     // 1. Obtener opciones iniciales para filtros
     const marcas = await getMarcasUnicas();
+    const combustibles = await getCombustiblesUnicos();
+    const transmisiones = await getTransmisionesUnicas();
     
-    // Obtener rango de precios general
-    const { data: minPriceData } = await supabase.from('vehiculos').select('precio').not('precio', 'is', null).order('precio', { ascending: true }).limit(1).single();
-    const { data: maxPriceData } = await supabase.from('vehiculos').select('precio').not('precio', 'is', null).order('precio', { ascending: false }).limit(1).single();
+    // Obtener rango de precios general (DINÁMICO según filtros activos, pero sin aplicar precioMin/precioMax)
+    let minPriceQuery = supabase.from('vehiculos').select('precio').not('precio', 'is', null);
+    let maxPriceQuery = supabase.from('vehiculos').select('precio').not('precio', 'is', null);
+    if (marca) { minPriceQuery = minPriceQuery.eq('marca', marca); maxPriceQuery = maxPriceQuery.eq('marca', marca); }
+    if (modelo) { minPriceQuery = minPriceQuery.eq('modelo', modelo); maxPriceQuery = maxPriceQuery.eq('modelo', modelo); }
+    if (anio) { minPriceQuery = minPriceQuery.eq('anio', anio); maxPriceQuery = maxPriceQuery.eq('anio', anio); }
+    if (kmMin) { minPriceQuery = minPriceQuery.gte('km', Number(kmMin)); maxPriceQuery = maxPriceQuery.gte('km', Number(kmMin)); }
+    if (kmMax) { minPriceQuery = minPriceQuery.lte('km', Number(kmMax)); maxPriceQuery = maxPriceQuery.lte('km', Number(kmMax)); }
+    if (combustible) { minPriceQuery = minPriceQuery.eq('combustible', combustible); maxPriceQuery = maxPriceQuery.eq('combustible', combustible); }
+    if (transmision) { minPriceQuery = minPriceQuery.eq('transmision', transmision); maxPriceQuery = maxPriceQuery.eq('transmision', transmision); }
+    const { data: minPriceData } = await minPriceQuery.order('precio', { ascending: true }).limit(1).single();
+    const { data: maxPriceData } = await maxPriceQuery.order('precio', { ascending: false }).limit(1).single();
     const overallMinPrice = minPriceData?.precio ?? 0;
     const overallMaxPrice = maxPriceData?.precio ?? 1000000000;
 
@@ -157,10 +208,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
     if (anio) query = query.eq('anio', anio);
     if (precioMin) query = query.gte('precio', Number(precioMin));
     if (precioMax) query = query.lte('precio', Number(precioMax));
+    if (kmMin) query = query.gte('km', Number(kmMin));
+    if (kmMax) query = query.lte('km', Number(kmMax));
+    if (combustible) query = query.eq('combustible', combustible);
+    if (transmision) query = query.eq('transmision', transmision);
+    if (sortBy && sortOrder) {
+      query = query.order(sortBy, { ascending: sortOrder === 'asc' });
+    } else {
+      query = query.order("anio", { ascending: false });
+    }
 
     // 3. Ejecutar consulta paginada
     const { data: vehiculos, error, count } = await query
-      .order("anio", { ascending: false })
       .range(offset, offset + limit - 1);
 
     if (error) throw error;
@@ -170,24 +229,32 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return json({
       vehiculos: vehiculos || [],
       marcas,
-      filtrosActivos: { marca, modelo, anio, precioMin, precioMax },
+      combustibles,
+      transmisiones,
+      filtrosActivos: { marca, modelo, anio, precioMin, precioMax, kmMin, kmMax, combustible, transmision },
       totalVehiculos,
       hasMore: offset + (vehiculos?.length || 0) < totalVehiculos,
       offset,
       overallMinPrice,
       overallMaxPrice,
+      overallMinKm: Number(kmMin) || 0,
+      overallMaxKm: Number(kmMax) || 1000000,
     });
   } catch (error: any) {
     return json({
       vehiculos: [],
       marcas: [],
-      filtrosActivos: { marca: null, modelo: null, anio: null, precioMin: null, precioMax: null },
+      combustibles: [],
+      transmisiones: [],
+      filtrosActivos: { marca: null, modelo: null, anio: null, precioMin: null, precioMax: null, kmMin: null, kmMax: null, combustible: null, transmision: null },
       error: error?.message || "Error desconocido",
       totalVehiculos: 0,
       hasMore: false,
       offset: 0,
       overallMinPrice: 0,
       overallMaxPrice: 1000000000,
+      overallMinKm: 0,
+      overallMaxKm: 1000000,
     });
   }
 }
@@ -285,7 +352,14 @@ const FiltrosContent = ({
   priceRange, setPriceRange,
   setMinPrice, setMaxPrice,
   setPrecioRango, formatPrice,
-  handleClearFilters
+  handleClearFilters,
+  combustible, setCombustible,
+  combustibles,
+  transmision, setTransmision,
+  transmisiones,
+  setIsModalVisible,
+  setModalFiltrosOpen,
+  modalFiltrosOpen,
 }: any) => (
   <Fragment>
     <div className="space-y-6">
@@ -393,13 +467,53 @@ const FiltrosContent = ({
           formatPrice={formatPrice}
         />
       </div>
+
+      {/* Filtro por Combustible */}
+      <div>
+        <h3 className="font-semibold text-brand-title mb-2">Combustible</h3>
+        <div className="max-h-48 overflow-y-auto space-y-0.5 pr-2">
+          {combustibles.map((c: string) => (
+            <button
+              key={c}
+              onClick={() => setCombustible(c === combustible ? "" : c)}
+              className={`w-full text-left px-2 py-1 rounded text-xs transition-colors ${combustible === c ? 'bg-brand-primary text-white font-semibold shadow' : 'text-brand-text hover:bg-brand-secondary'}`}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Filtro por Transmisión */}
+      <div>
+        <h3 className="font-semibold text-brand-title mb-2">Transmisión</h3>
+        <div className="max-h-48 overflow-y-auto space-y-0.5 pr-2">
+          {transmisiones.map((t: string) => (
+            <button
+              key={t}
+              onClick={() => setTransmision(t === transmision ? "" : t)}
+              className={`w-full text-left px-2 py-1 rounded text-xs transition-colors ${transmision === t ? 'bg-brand-primary text-white font-semibold shadow' : 'text-brand-text hover:bg-brand-secondary'}`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
 
     {/* Botón Limpiar Filtros */}
     <div className="mt-8 pt-4 border-t border-brand-secondary">
       <button
         type="button"
-        onClick={handleClearFilters}
+        onClick={() => {
+          handleClearFilters();
+          if (modalFiltrosOpen && typeof setIsModalVisible === 'function' && typeof setModalFiltrosOpen === 'function') {
+            setIsModalVisible(false);
+            setTimeout(() => {
+              setModalFiltrosOpen(false);
+            }, 500);
+          }
+        }}
         className="w-full inline-flex justify-center rounded-md border border-brand-secondary px-4 py-2 text-sm font-medium text-brand-text bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-highlight focus:ring-offset-2"
       >
         Limpiar Filtros
@@ -415,19 +529,35 @@ export default function VehiculosPage() {
   const navigate = useNavigate();
   const [modalFiltrosOpen, setModalFiltrosOpen] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [modalOrdenOpen, setModalOrdenOpen] = useState(false);
+  const [isOrdenModalVisible, setIsOrdenModalVisible] = useState(false);
 
-  // Efecto para controlar la animación de entrada del modal
+  // Efecto para controlar la animación de entrada del modal de filtros
   useEffect(() => {
     if (modalFiltrosOpen) {
       setIsModalVisible(true);
     }
   }, [modalFiltrosOpen]);
 
+  // Efecto para animación del modal de ordenamiento
+  useEffect(() => {
+    if (modalOrdenOpen) {
+      setIsOrdenModalVisible(true);
+    }
+  }, [modalOrdenOpen]);
+
   const closeModal = () => {
     setIsModalVisible(false);
     setTimeout(() => {
       setModalFiltrosOpen(false);
     }, 500); // Coincide con la duración de la animación
+  };
+
+  const closeOrdenModal = () => {
+    setIsOrdenModalVisible(false);
+    setTimeout(() => {
+      setModalOrdenOpen(false);
+    }, 500);
   };
 
   // Type guard para saber si tenemos los datos principales o solo opciones
@@ -446,9 +576,13 @@ export default function VehiculosPage() {
   const [precioRango, setPrecioRango] = useState<string | null>(null);
   const [minPrice, setMinPrice] = useState(isMainData(loaderData) ? loaderData.filtrosActivos.precioMin || "" : "");
   const [maxPrice, setMaxPrice] = useState(isMainData(loaderData) ? loaderData.filtrosActivos.precioMax || "" : "");
+  const [combustible, setCombustible] = useState(isMainData(loaderData) ? loaderData.filtrosActivos.combustible || "" : "");
+  const [transmision, setTransmision] = useState(isMainData(loaderData) ? loaderData.filtrosActivos.transmision || "" : "");
 
   const debouncedMinPrice = useDebounce(minPrice, 500);
   const debouncedMaxPrice = useDebounce(maxPrice, 500);
+  const debouncedCombustible = useDebounce(combustible, 500);
+  const debouncedTransmision = useDebounce(transmision, 500);
 
   // Fetchers para opciones dinámicas
   const modelosFetcher = useFetcher<OptionsLoaderData>();
@@ -486,6 +620,10 @@ export default function VehiculosPage() {
     }
   }, [marca, modelo]);
 
+  // Estados para ordenamiento
+  const [selectedSortBy, setSelectedSortBy] = useState(() => searchParams.get("sortBy") || "");
+  const [selectedSortOrder, setSelectedSortOrder] = useState(() => searchParams.get("sortOrder") || "");
+
   // Sincronizar estado de filtros con searchParams y disparar recarga
   useEffect(() => {
     const params = new URLSearchParams();
@@ -494,6 +632,10 @@ export default function VehiculosPage() {
     if (anio) params.set("anio", anio);
     if (debouncedMinPrice) params.set("precioMin", debouncedMinPrice);
     if (debouncedMaxPrice) params.set("precioMax", debouncedMaxPrice);
+    if (debouncedCombustible) params.set("combustible", debouncedCombustible);
+    if (debouncedTransmision) params.set("transmision", debouncedTransmision);
+    if (selectedSortBy) params.set("sortBy", selectedSortBy);
+    if (selectedSortOrder) params.set("sortOrder", selectedSortOrder);
     
     // Comparamos solo la parte de filtros, no el offset
     const currentFilterParams = new URLSearchParams(searchParams);
@@ -505,7 +647,7 @@ export default function VehiculosPage() {
       fetcher.load(`/vehiculosAdminGrid?${params.toString()}`);
       setSearchParams(params, { replace: true });
     }
-  }, [marca, modelo, anio, debouncedMinPrice, debouncedMaxPrice, searchParams, setSearchParams]);
+  }, [marca, modelo, anio, debouncedMinPrice, debouncedMaxPrice, debouncedCombustible, debouncedTransmision, selectedSortBy, selectedSortOrder, searchParams, setSearchParams]);
 
   // Actualizar la lista de items cuando el fetcher trae nuevos datos
   useEffect(() => {
@@ -514,7 +656,14 @@ export default function VehiculosPage() {
       if (data.offset === 0) {
         setItems(data.vehiculos);
       } else {
-        setItems(prevItems => [...prevItems, ...data.vehiculos]);
+        setItems(prevItems => {
+          // Evita duplicados por uuid
+          const existingUuids = new Set(prevItems.map(v => v.uuid));
+          const nuevos = data.vehiculos.filter(v => !existingUuids.has(v.uuid));
+          const merged = [...prevItems, ...nuevos];
+          // Nunca mostrar más de totalVehiculos
+          return merged.slice(0, data.totalVehiculos);
+        });
       }
       setHasMore(data.hasMore);
       setTotalResultados(data.totalVehiculos);
@@ -529,6 +678,8 @@ export default function VehiculosPage() {
     setPrecioRango(null);
     setMinPrice("");
     setMaxPrice("");
+    setCombustible("");
+    setTransmision("");
     setSearchParams({}, { replace: true });
   };
   
@@ -546,6 +697,8 @@ export default function VehiculosPage() {
 
   const modelos = modelosFetcher.data?.modelos || [];
   const anios = aniosFetcher.data?.anios || [];
+  const combustibles = isMainData(loaderData) ? loaderData.combustibles : [];
+  const transmisiones = isMainData(loaderData) ? loaderData.transmisiones : [];
 
   const formatPrice = (price: number | null) => {
     if (!price) return "-";
@@ -564,22 +717,13 @@ export default function VehiculosPage() {
   const overallMinPrice = isMain ? loaderData.overallMinPrice : 0;
   const overallMaxPrice = isMain ? loaderData.overallMaxPrice : 1000000000;
 
-  // Estado para el slider de precio
-  const [priceRange, setPriceRange] = useState<[
-    number,
-    number
-  ]>([
-    overallMinPrice,
-    overallMaxPrice
-  ]);
-
-  // Sincroniza el estado del slider con los filtros activos
+  // Estado para el slider de precio (dinámico y reactivo a los filtros)
+  const [priceRange, setPriceRange] = useState<[number, number]>([overallMinPrice, overallMaxPrice]);
   useEffect(() => {
-    setPriceRange([
-      Number(minPrice) || overallMinPrice,
-      Number(maxPrice) || overallMaxPrice
-    ]);
-  }, [minPrice, maxPrice, overallMinPrice, overallMaxPrice]);
+    setPriceRange([overallMinPrice, overallMaxPrice]);
+    setMinPrice("");
+    setMaxPrice("");
+  }, [overallMinPrice, overallMaxPrice]);
 
   const commonFilterProps = {
     loaderData,
@@ -595,6 +739,13 @@ export default function VehiculosPage() {
     setMinPrice, setMaxPrice,
     setPrecioRango, formatPrice,
     handleClearFilters,
+    combustible, setCombustible,
+    combustibles,
+    transmision, setTransmision,
+    transmisiones,
+    setIsModalVisible,
+    setModalFiltrosOpen,
+    modalFiltrosOpen,
   };
 
   if (!isMain) {
@@ -613,27 +764,56 @@ export default function VehiculosPage() {
 
       {/* Contenido Principal */}
       <main className="flex-1 p-8 overflow-y-auto">
-        <div className="mb-8 flex items-center justify-between">
-          <div>
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2 sm:gap-0 sm:flex-row sm:items-center">
             <h1 className="text-2xl font-bold text-brand-title">
               Listado de Vehículos ({totalResultados})
             </h1>
-            {fetcher.state === 'loading' && !isLoadingMore && (
-              <p className="text-sm text-brand-text mt-2 animate-pulse">Buscando vehículos...</p>
-            )}
           </div>
-          <div className="lg:hidden">
-            <button
-              type="button"
-              onClick={() => setModalFiltrosOpen(true)}
-              className="inline-flex items-center rounded-md border border-brand-secondary bg-white px-4 py-2 text-sm font-medium text-brand-text shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-highlight focus:ring-offset-2"
+          {/* Selector de ordenamiento - Desktop visible, Mobile oculto */}
+          <div className="hidden lg:block ml-auto">
+            <label htmlFor="sort-select" className="font-medium text-brand-title mr-2">Ordenar por:</label>
+            <select
+              id="sort-select"
+              value={`${selectedSortBy}|${selectedSortOrder}`}
+              onChange={e => {
+                const [by, order] = e.target.value.split('|');
+                setSelectedSortBy(by);
+                setSelectedSortOrder(order);
+              }}
+              className="bg-white border border-brand-secondary rounded-md px-3 py-2 text-brand-title shadow-sm w-auto focus:outline-none focus:ring-2 focus:ring-brand-highlight"
             >
-              <svg className="-ml-1 mr-2 h-5 w-5 text-brand-text" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path fillRule="evenodd" d="M2 4.75A.75.75 0 012.75 4h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 4.75zM2 10a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 10zm0 5.25a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75a.75.75 0 01-.75-.75z" clipRule="evenodd" />
-              </svg>
-              Filtros
-            </button>
+              <option value="precio|asc">Precio: Menor a Mayor</option>
+              <option value="precio|desc">Precio: Mayor a Menor</option>
+              <option value="anio|desc">Año: Más Nuevo</option>
+              <option value="anio|asc">Año: Más Antiguo</option>
+              <option value="km|asc">Kilometraje: Menor a Mayor</option>
+              <option value="km|desc">Kilometraje: Mayor a Menor</option>
+            </select>
           </div>
+        </div>
+        {/* Selector de ordenamiento - Mobile visible, Desktop oculto */}
+        <div className="flex items-center justify-between mb-4 lg:hidden">
+          <button
+            type="button"
+            onClick={() => setModalFiltrosOpen(true)}
+            className="inline-flex items-center rounded-md border border-brand-secondary bg-white px-4 py-2 text-sm font-medium text-brand-text shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-highlight focus:ring-offset-2"
+          >
+            <svg className="-ml-1 mr-2 h-5 w-5 text-brand-text" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fillRule="evenodd" d="M2 4.75A.75.75 0 012.75 4h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 4.75zM2 10a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 10zm0 5.25a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75a.75.75 0 01-.75-.75z" clipRule="evenodd" />
+            </svg>
+            Filtros
+          </button>
+          <button
+            type="button"
+            onClick={() => setModalOrdenOpen(true)}
+            className="inline-flex items-center rounded-md border border-brand-secondary bg-white px-4 py-2 text-sm font-medium text-brand-title shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-highlight ml-4 flex-1 justify-center"
+          >
+            <svg className="-ml-1 mr-2 h-5 w-5 text-brand-title" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fillRule="evenodd" d="M3 7a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h8a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h4a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+            </svg>
+            Ordenar
+          </button>
         </div>
         
         {loaderData.error ? (
@@ -778,7 +958,7 @@ export default function VehiculosPage() {
           aria-modal="true"
         >
           <div
-            className={`fixed bottom-0 left-0 right-0 h-[90vh] bg-white rounded-t-xl shadow-lg flex flex-col transition-transform duration-500 ease-in-out transform ${isModalVisible ? 'translate-y-0' : 'translate-y-full'}`}
+            className={`fixed bottom-0 left-0 right-0 h-[90vh] max-h-[90vh] bg-white rounded-t-xl shadow-lg flex flex-col transition-transform duration-500 ease-in-out transform ${isModalVisible ? 'translate-y-0' : 'translate-y-full'}`}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center p-6 border-b border-brand-secondary">
@@ -793,16 +973,89 @@ export default function VehiculosPage() {
                 </svg>
               </button>
             </div>
-            <div className="p-6 flex-grow overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <div className="p-6 flex-grow overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden max-h-full">
               <FiltrosContent {...commonFilterProps} />
             </div>
             <div className="p-6 border-t border-brand-secondary bg-white">
               <button
                 type="button"
-                onClick={closeModal}
+                onClick={() => {
+                  handleClearFilters();
+                  if (typeof setIsModalVisible === 'function' && typeof setModalFiltrosOpen === 'function') {
+                    setIsModalVisible(false);
+                    setTimeout(() => {
+                      setModalFiltrosOpen(false);
+                    }, 500);
+                  }
+                }}
                 className="w-full inline-flex justify-center rounded-md border border-transparent bg-brand-primary px-4 py-2 text-base font-medium text-brand-title shadow-sm hover:bg-brand-secondary focus:outline-none focus:ring-2 focus:ring-brand-highlight focus:ring-offset-2"
               >
                 Aplicar Filtros
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Ordenamiento (Mobile) */}
+      {modalOrdenOpen && (
+        <div
+          className={`fixed inset-0 bg-black z-40 lg:hidden transition-opacity duration-500 ease-in-out ${isOrdenModalVisible ? 'bg-opacity-50' : 'bg-opacity-0'}`}
+          onClick={closeOrdenModal}
+          aria-modal="true"
+        >
+          <div
+            className={`fixed bottom-0 left-0 right-0 h-auto bg-white rounded-t-xl shadow-lg flex flex-col transition-transform duration-500 ease-in-out transform ${isOrdenModalVisible ? 'translate-y-0' : 'translate-y-full'}`}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center p-6 border-b border-brand-secondary">
+              <h2 className="text-xl font-bold text-brand-title">Ordenar por</h2>
+              <button
+                type="button"
+                onClick={closeOrdenModal}
+                className="p-1 rounded-full text-brand-text hover:bg-gray-100"
+              >
+                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-6 flex flex-col gap-2">
+              <button
+                className={`w-full text-left px-4 py-3 rounded-md text-base transition-colors ${selectedSortBy === 'precio' && selectedSortOrder === 'asc' ? 'bg-brand-primary text-white font-semibold shadow' : 'text-brand-title hover:bg-brand-secondary'}`}
+                onClick={() => { setSelectedSortBy('precio'); setSelectedSortOrder('asc'); closeOrdenModal(); }}
+              >
+                Precio: Menor a Mayor
+              </button>
+              <button
+                className={`w-full text-left px-4 py-3 rounded-md text-base transition-colors ${selectedSortBy === 'precio' && selectedSortOrder === 'desc' ? 'bg-brand-primary text-white font-semibold shadow' : 'text-brand-title hover:bg-brand-secondary'}`}
+                onClick={() => { setSelectedSortBy('precio'); setSelectedSortOrder('desc'); closeOrdenModal(); }}
+              >
+                Precio: Mayor a Menor
+              </button>
+              <button
+                className={`w-full text-left px-4 py-3 rounded-md text-base transition-colors ${selectedSortBy === 'anio' && selectedSortOrder === 'desc' ? 'bg-brand-primary text-white font-semibold shadow' : 'text-brand-title hover:bg-brand-secondary'}`}
+                onClick={() => { setSelectedSortBy('anio'); setSelectedSortOrder('desc'); closeOrdenModal(); }}
+              >
+                Año: Más Nuevo
+              </button>
+              <button
+                className={`w-full text-left px-4 py-3 rounded-md text-base transition-colors ${selectedSortBy === 'anio' && selectedSortOrder === 'asc' ? 'bg-brand-primary text-white font-semibold shadow' : 'text-brand-title hover:bg-brand-secondary'}`}
+                onClick={() => { setSelectedSortBy('anio'); setSelectedSortOrder('asc'); closeOrdenModal(); }}
+              >
+                Año: Más Antiguo
+              </button>
+              <button
+                className={`w-full text-left px-4 py-3 rounded-md text-base transition-colors ${selectedSortBy === 'km' && selectedSortOrder === 'asc' ? 'bg-brand-primary text-white font-semibold shadow' : 'text-brand-title hover:bg-brand-secondary'}`}
+                onClick={() => { setSelectedSortBy('km'); setSelectedSortOrder('asc'); closeOrdenModal(); }}
+              >
+                Kilometraje: Menor a Mayor
+              </button>
+              <button
+                className={`w-full text-left px-4 py-3 rounded-md text-base transition-colors ${selectedSortBy === 'km' && selectedSortOrder === 'desc' ? 'bg-brand-primary text-white font-semibold shadow' : 'text-brand-title hover:bg-brand-secondary'}`}
+                onClick={() => { setSelectedSortBy('km'); setSelectedSortOrder('desc'); closeOrdenModal(); }}
+              >
+                Kilometraje: Mayor a Menor
               </button>
             </div>
           </div>
