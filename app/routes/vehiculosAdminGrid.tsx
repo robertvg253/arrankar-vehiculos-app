@@ -182,7 +182,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const combustibles = await getCombustiblesUnicos();
     const transmisiones = await getTransmisionesUnicas();
     
-    // Obtener rango de precios general (DINÁMICO según filtros activos, pero sin aplicar precioMin/precioMax)
+    // Obtener rango de precios dinámico según los filtros activos (excepto precioMin/precioMax)
     let minPriceQuery = supabase.from('vehiculos').select('precio').not('precio', 'is', null);
     let maxPriceQuery = supabase.from('vehiculos').select('precio').not('precio', 'is', null);
     if (marca) { minPriceQuery = minPriceQuery.eq('marca', marca); maxPriceQuery = maxPriceQuery.eq('marca', marca); }
@@ -357,9 +357,6 @@ const FiltrosContent = ({
   combustibles,
   transmision, setTransmision,
   transmisiones,
-  setIsModalVisible,
-  setModalFiltrosOpen,
-  modalFiltrosOpen,
 }: any) => (
   <Fragment>
     <div className="space-y-6">
@@ -505,15 +502,7 @@ const FiltrosContent = ({
     <div className="mt-8 pt-4 border-t border-brand-secondary">
       <button
         type="button"
-        onClick={() => {
-          handleClearFilters();
-          if (modalFiltrosOpen && typeof setIsModalVisible === 'function' && typeof setModalFiltrosOpen === 'function') {
-            setIsModalVisible(false);
-            setTimeout(() => {
-              setModalFiltrosOpen(false);
-            }, 500);
-          }
-        }}
+        onClick={handleClearFilters}
         className="w-full inline-flex justify-center rounded-md border border-brand-secondary px-4 py-2 text-sm font-medium text-brand-text bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-highlight focus:ring-offset-2"
       >
         Limpiar Filtros
@@ -743,9 +732,6 @@ export default function VehiculosPage() {
     combustibles,
     transmision, setTransmision,
     transmisiones,
-    setIsModalVisible,
-    setModalFiltrosOpen,
-    modalFiltrosOpen,
   };
 
   if (!isMain) {
@@ -979,15 +965,7 @@ export default function VehiculosPage() {
             <div className="p-6 border-t border-brand-secondary bg-white">
               <button
                 type="button"
-                onClick={() => {
-                  handleClearFilters();
-                  if (typeof setIsModalVisible === 'function' && typeof setModalFiltrosOpen === 'function') {
-                    setIsModalVisible(false);
-                    setTimeout(() => {
-                      setModalFiltrosOpen(false);
-                    }, 500);
-                  }
-                }}
+                onClick={closeModal}
                 className="w-full inline-flex justify-center rounded-md border border-transparent bg-brand-primary px-4 py-2 text-base font-medium text-brand-title shadow-sm hover:bg-brand-secondary focus:outline-none focus:ring-2 focus:ring-brand-highlight focus:ring-offset-2"
               >
                 Aplicar Filtros
