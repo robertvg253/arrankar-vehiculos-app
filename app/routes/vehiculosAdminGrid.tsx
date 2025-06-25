@@ -567,6 +567,8 @@ export default function VehiculosPage() {
   const [maxPrice, setMaxPrice] = useState(isMainData(loaderData) ? loaderData.filtrosActivos.precioMax || "" : "");
   const [combustible, setCombustible] = useState(isMainData(loaderData) ? loaderData.filtrosActivos.combustible || "" : "");
   const [transmision, setTransmision] = useState(isMainData(loaderData) ? loaderData.filtrosActivos.transmision || "" : "");
+  const [minKm, setMinKm] = useState(isMainData(loaderData) ? loaderData.filtrosActivos.kmMin || "" : "");
+  const [maxKm, setMaxKm] = useState(isMainData(loaderData) ? loaderData.filtrosActivos.kmMax || "" : "");
 
   const debouncedMinPrice = useDebounce(minPrice, 500);
   const debouncedMaxPrice = useDebounce(maxPrice, 500);
@@ -667,9 +669,12 @@ export default function VehiculosPage() {
     setPrecioRango(null);
     setMinPrice("");
     setMaxPrice("");
+    setMinKm("");
+    setMaxKm("");
     setCombustible("");
     setTransmision("");
     setSearchParams({}, { replace: true });
+    if (modalFiltrosOpen) closeModal();
   };
   
   const handlePrecioRangoClick = (rango: string, min: string, max: string) => {
