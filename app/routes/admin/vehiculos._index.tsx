@@ -185,6 +185,7 @@ export default function VehiculosPage() {
                     {vehiculo.combustible ? ` • ${vehiculo.combustible}` : ''}
                     {vehiculo.km !== null ? ` • ${formatMileage(vehiculo.km)}` : ''}
                   </div>
+
                 </div>
                 {/* Botón Editar */}
                 <button
@@ -329,3 +330,4 @@ export default function VehiculosPage() {
     </div>
   );
 }
+

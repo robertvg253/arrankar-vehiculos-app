@@ -9,6 +9,7 @@ import {
 } from "@remix-run/node";
 import { useLoaderData, useFetcher, useSubmit, useActionData, useNavigate } from "@remix-run/react";
 import { supabase } from "~/utils/supabase.server";
+import { getSession } from "~/utils/session.server";
 import ImageUploader, { type ImageUploaderChanges, type ImageMetadata } from "../components/ImageUploader";
 import LoadingToast from "../components/LoadingToast";
 
@@ -205,38 +206,62 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   try {
+    // Obtener sesión y extraer IDs
+    const session = await getSession(request);
+    const concesionario_id = session.get("concesionario_id");
+    const auth_id = session.get("user_id");
+    if (!concesionario_id || !auth_id) {
+      return json({ error: "No se encontró información de usuario/concesionario en la sesión. Por favor, inicia sesión nuevamente." }, { status: 401 });
+    }
+
+    // Buscar el uuid del usuario en la tabla users usando el auth_id
+    const { data: userRow, error: userLookupError } = await supabase
+      .from("users")
+      .select("uuid")
+      .eq("auth_id", auth_id)
+      .single();
+    if (userLookupError || !userRow?.uuid) {
+      return json({ error: "No se encontró el usuario en la base de datos. Por favor, revisa tu sesión." }, { status: 401 });
+    }
+    const user_id = userRow.uuid;
+
     // Extraer todos los campos del formulario
     const marca = formData.get('marca') as string;
     const modelo = formData.get('modelo') as string;
-    const anio = Number(formData.get('anio'));
+    const anioRaw = formData.get('anio');
+    const anio = Number(anioRaw);
     const version = formData.get('version') as string;
-    const puertas = Number(formData.get('puertas'));
+    const puertasRaw = formData.get('puertas');
+    const puertas = Number(puertasRaw);
     const combustible = formData.get('combustible') as string;
     const color = formData.get('color') as string;
     const placa = formData.get('placa') as string;
-    const km = Number(formData.get('km'));
-    const precio = Number(formData.get('precio'));
+    const kmRaw = formData.get('km');
+    const km = Number(kmRaw);
+    const precioRaw = formData.get('precio');
+    const precio = Number(precioRaw);
     const transmision = formData.get('transmision') as string;
     const carroceria = formData.get('carroceria') as string;
     const traccion = formData.get('traccion') as string;
-    const cilindraje = Number(formData.get('cilindraje'));
+    const cilindrajeRaw = formData.get('cilindraje');
+    const cilindraje = Number(cilindrajeRaw);
 
     // Validación de campos requeridos
     const errors: Record<string, string> = {};
     if (!marca) errors.marca = "Marca es requerida";
     if (!modelo) errors.modelo = "Modelo es requerido";
-    if (!anio || isNaN(anio)) errors.anio = "Año es requerido";
+    if (anioRaw === null || anioRaw === "" || isNaN(anio)) errors.anio = "Año es requerido";
     if (!version) errors.version = "Versión es requerida";
-    if (!puertas || isNaN(puertas)) errors.puertas = "Puertas es requerido";
+    if (puertasRaw === null || puertasRaw === "" || isNaN(puertas)) errors.puertas = "Puertas es requerido";
     if (!combustible) errors.combustible = "Combustible es requerido";
     if (!color) errors.color = "Color es requerido";
     if (!placa?.trim()) errors.placa = "Placa es requerida";
-    if (!km || isNaN(km)) errors.km = "Kilometraje es requerido";
-    if (!precio || isNaN(precio)) errors.precio = "Precio es requerido";
+    if (kmRaw === null || kmRaw === "" || isNaN(km)) errors.km = "Kilometraje es requerido";
+    if (precioRaw === null || precioRaw === "" || isNaN(precio)) errors.precio = "Precio es requerido";
     if (!transmision) errors.transmision = "Transmisión es requerida";
     if (!carroceria) errors.carroceria = "Carrocería es requerida";
     if (!traccion) errors.traccion = "Tracción es requerida";
-    if (!cilindraje || isNaN(cilindraje)) errors.cilindraje = "Cilindraje es requerido";
+    if (cilindrajeRaw === null || cilindrajeRaw === "" || isNaN(cilindraje)) errors.cilindraje = "Cilindraje es requerido";
 
     if (Object.keys(errors).length > 0) {
       return json({ errors }, { status: 400 });
@@ -268,6 +293,8 @@ export async function action({ request }: ActionFunctionArgs) {
         carroceria,
         traccion,
         cilindraje,
+        concesionario_id,
+        user_id,
       }])
       .select('id, uuid')
       .single();
@@ -294,8 +321,9 @@ export async function action({ request }: ActionFunctionArgs) {
           return;
         }
 
-        const filePath = `${vehicleId}/${meta.storage_id}`; // Usar solo vehicleId y storage_id para la ruta
-        console.log("Subiendo a path:", filePath);
+        // El path debe usar el id numérico (vehicleId) para coincidir con el storage
+        const filePath = `${vehicleId}/${meta.storage_id}`; // vehicleId es int8, así se ve en el bucket
+        console.log("Subiendo a path:", filePath, "(vehicleId:", vehicleId, ", storage_id:", meta.storage_id, ")");
         
         // Verificar que el bucket existe antes de subir
         const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
@@ -326,21 +354,22 @@ export async function action({ request }: ActionFunctionArgs) {
         const { data: urlData } = supabase.storage.from('imagen-vehiculo').getPublicUrl(filePath);
         console.log("URL pública generada:", urlData.publicUrl);
 
+        // Insertar en la tabla images usando vehicle_id = vehicleUuid
         const insertResult = await supabase.from('images').insert({
-          vehicle_id: vehicleUuid,
+          vehicle_id: vehicleUuid, // <-- usar uuid del vehículo
           url: urlData.publicUrl,
           order_index: String(meta.order_index),
           storage_id: meta.storage_id,
           destacada: meta.destacada ? 'true' : 'false',
-          id_v: String(vehicleId),
+          id_v: String(vehicleId), // opcional, solo referencia
         });
 
         if (insertResult.error) {
-          console.error("Error insertando en BD:", insertResult.error);
+          console.error("Error insertando en BD images:", insertResult.error);
           throw insertResult.error;
         }
 
-        console.log("Resultado inserción en BD:", insertResult);
+        console.log("Resultado inserción en BD images:", insertResult);
         return insertResult;
       });
 

@@ -587,7 +587,7 @@ export default function VehiculosPage() {
         if (entries[0].isIntersecting) {
           setIsLoadingMore(true);
           const newOffset = items.length;
-          const params = new URLSearchParams(searchParams);
+    const params = new URLSearchParams(searchParams);
           params.set("offset", String(newOffset));
           fetcher.load(`/vehiculosAdminGrid?${params.toString()}`);
         }
@@ -744,7 +744,7 @@ export default function VehiculosPage() {
     // Esto previene errores en el cliente cuando el loader devuelve solo opciones.
     return null;
   }
-  
+
   return (
     <div className="flex font-sans bg-brand-bg min-h-screen">
       {/* Sidebar de Filtros (Desktop) */}
@@ -757,9 +757,9 @@ export default function VehiculosPage() {
       <main className="flex-1 p-8 overflow-y-auto">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-col gap-2 sm:gap-0 sm:flex-row sm:items-center">
-            <h1 className="text-2xl font-bold text-brand-title">
+          <h1 className="text-2xl font-bold text-brand-title">
               Listado de Vehículos ({totalResultados})
-            </h1>
+          </h1>
           </div>
           {/* Selector de ordenamiento - Desktop visible, Mobile oculto */}
           <div className="hidden lg:block ml-auto">
@@ -785,8 +785,8 @@ export default function VehiculosPage() {
         </div>
         {/* Selector de ordenamiento - Mobile visible, Desktop oculto */}
         <div className="flex items-center justify-between mb-4 lg:hidden">
-          <button
-            type="button"
+        <button
+          type="button"
             onClick={() => setModalFiltrosOpen(true)}
             className="inline-flex items-center rounded-md border border-brand-secondary bg-white px-4 py-2 text-sm font-medium text-brand-text shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-highlight focus:ring-offset-2"
           >
@@ -802,33 +802,33 @@ export default function VehiculosPage() {
           >
             <svg className="-ml-1 mr-2 h-5 w-5 text-brand-title" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fillRule="evenodd" d="M3 7a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h8a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h4a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-            </svg>
+          </svg>
             Ordenar
-          </button>
-        </div>
-        
+        </button>
+      </div>
+
         {loaderData.error ? (
-          <div className="rounded-md bg-red-100 p-4">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg
-                  className="h-5 w-5 text-red-400"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  aria-hidden="true"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">
-                  Error al cargar los vehículos
-                </h3>
-                <div className="mt-2 text-sm text-red-700">
+        <div className="rounded-md bg-red-100 p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg
+                className="h-5 w-5 text-red-400"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">
+                Error al cargar los vehículos
+              </h3>
+              <div className="mt-2 text-sm text-red-700">
                   {loaderData.error}
                 </div>
               </div>
@@ -837,86 +837,86 @@ export default function VehiculosPage() {
         ) : fetcher.state === 'loading' && !isLoadingMore ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
               {Array.from({ length: 6 }).map((_, i) => <VehiculoCardSkeleton key={i} />)}
-            </div>
+        </div>
         ) : items.length > 0 ? (
-          <>
+        <>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
               {items.map((vehiculo: VehiculoType, index: number) => (
-                <div
+              <div
                   key={`${vehiculo.uuid}-${index}`}
                   ref={index === items.length - 1 ? lastItemRef : null}
-                  className="bg-white rounded-xl border border-brand-secondary shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden group cursor-pointer"
-                  onClick={() => navigate(`/vehiculos/${vehiculo.uuid}`)}
-                >
-                  {/* Imagen del vehículo */}
-                  <div className="relative h-48 overflow-hidden">
-                    {vehiculo.url_img ? (
-                      <img 
-                        src={vehiculo.url_img} 
-                        alt={`${vehiculo.marca || 'Vehículo'} ${vehiculo.modelo || ''}`} 
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-brand-bg text-brand-highlight">
-                        <svg className="w-12 h-12 opacity-50" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                    )}
-                    {/* Overlay con año y transmisión */}
-                    <div className="absolute top-3 left-3 bg-black bg-opacity-75 text-white px-2 py-1 rounded-md text-xs font-medium">
-                      {vehiculo.anio || '-'} • {vehiculo.transmision || '-'}
-                    </div>
-                  </div>
-
-                  {/* Contenido de la tarjeta */}
-                  <div className="p-4 space-y-3">
-                    {/* Marca y Modelo */}
-                    <div>
-                      <h3 className="text-lg font-bold text-brand-title leading-tight">
-                        {vehiculo.marca || '-'} {vehiculo.modelo || ''}
-                      </h3>
-                    </div>
-
-                    {/* Kilometraje */}
-                    <div className="flex items-center text-sm text-brand-text">
-                      <svg className="w-4 h-4 mr-2 text-brand-highlight" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                        <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                className="bg-white rounded-xl border border-brand-secondary shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden group cursor-pointer"
+                onClick={() => navigate(`/vehiculos/${vehiculo.uuid}`)}
+              >
+                {/* Imagen del vehículo */}
+                <div className="relative h-48 overflow-hidden">
+                  {vehiculo.url_img ? (
+                    <img 
+                      src={vehiculo.url_img} 
+                      alt={`${vehiculo.marca || 'Vehículo'} ${vehiculo.modelo || ''}`} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-brand-bg text-brand-highlight">
+                      <svg className="w-12 h-12 opacity-50" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
                       </svg>
-                      <span>{formatMileage(vehiculo.km)}</span>
                     </div>
-
-                    {/* Precio */}
-                    <div className="pt-2 border-t border-brand-secondary">
-                      <div className="text-xl font-bold text-brand-primary">
-                        {formatPrice(vehiculo.precio)}
-                      </div>
-                    </div>
-
-                    {/* Botón Ver más */}
-                    <button
-                      type="button"
-                      className="w-full mt-3 inline-flex items-center justify-center rounded-md border border-transparent bg-brand-primary px-4 py-2 text-sm font-medium text-brand-title shadow-sm hover:bg-brand-secondary focus:outline-none focus:ring-2 focus:ring-brand-highlight focus:ring-offset-2 transition-colors duration-200"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/vehiculos/${vehiculo.uuid}`);
-                      }}
-                    >
-                      Ver más
-                    </button>
+                  )}
+                  {/* Overlay con año y transmisión */}
+                  <div className="absolute top-3 left-3 bg-black bg-opacity-75 text-white px-2 py-1 rounded-md text-xs font-medium">
+                    {vehiculo.anio || '-'} • {vehiculo.transmision || '-'}
                   </div>
                 </div>
-              ))}
-            </div>
+
+                {/* Contenido de la tarjeta */}
+                <div className="p-4 space-y-3">
+                  {/* Marca y Modelo */}
+                  <div>
+                    <h3 className="text-lg font-bold text-brand-title leading-tight">
+                      {vehiculo.marca || '-'} {vehiculo.modelo || ''}
+                    </h3>
+                  </div>
+
+                  {/* Kilometraje */}
+                  <div className="flex items-center text-sm text-brand-text">
+                    <svg className="w-4 h-4 mr-2 text-brand-highlight" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                      <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                    </svg>
+                    <span>{formatMileage(vehiculo.km)}</span>
+                  </div>
+
+                  {/* Precio */}
+                  <div className="pt-2 border-t border-brand-secondary">
+                    <div className="text-xl font-bold text-brand-primary">
+                      {formatPrice(vehiculo.precio)}
+                    </div>
+                  </div>
+
+                  {/* Botón Ver más */}
+                  <button
+                    type="button"
+                    className="w-full mt-3 inline-flex items-center justify-center rounded-md border border-transparent bg-brand-primary px-4 py-2 text-sm font-medium text-brand-title shadow-sm hover:bg-brand-secondary focus:outline-none focus:ring-2 focus:ring-brand-highlight focus:ring-offset-2 transition-colors duration-200"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/vehiculos/${vehiculo.uuid}`);
+                    }}
+                  >
+                    Ver más
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
             {isLoadingMore && (
               <div className="text-center p-4 text-brand-text">Cargando más vehículos...</div>
             )}
             {!hasMore && items.length > 0 && (
               <div className="text-center p-4 text-brand-text">No hay más resultados.</div>
             )}
-          </>
-        ) : (
+        </>
+      ) : (
           <div className="text-center p-12 rounded-lg bg-gray-50 border border-gray-200">
             <div className="flex flex-col items-center justify-center">
                 <svg className="h-12 w-12 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -961,12 +961,12 @@ export default function VehiculosPage() {
               >
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              </svg>
               </button>
             </div>
             <div className="p-6 flex-grow overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden max-h-full">
               <FiltrosContent {...commonFilterProps} />
-            </div>
+              </div>
             <div className="p-6 border-t border-brand-secondary bg-white">
               <button
                 type="button"
@@ -993,7 +993,7 @@ export default function VehiculosPage() {
           >
             <div className="flex justify-between items-center p-6 border-b border-brand-secondary">
               <h2 className="text-xl font-bold text-brand-title">Ordenar por</h2>
-              <button
+          <button
                 type="button"
                 onClick={closeOrdenModal}
                 className="p-1 rounded-full text-brand-text hover:bg-gray-100"
@@ -1001,8 +1001,8 @@ export default function VehiculosPage() {
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
-              </button>
-            </div>
+          </button>
+        </div>
             <div className="p-6 flex flex-col gap-2">
               <button
                 className={`w-full text-left px-4 py-3 rounded-md text-base transition-colors ${selectedSortBy === 'precio' && selectedSortOrder === 'asc' ? 'bg-brand-primary text-white font-semibold shadow' : 'text-brand-title hover:bg-brand-secondary'}`}

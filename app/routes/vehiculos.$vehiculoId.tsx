@@ -303,17 +303,17 @@ export default function VehiculoDetallePage() {
 
   if (message) {
     return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <div className="text-center">
+      <div className="min-h-screen bg-brand-bg flex items-center justify-center p-4">
+        <div className="text-center bg-white rounded-2xl border border-gray-200 shadow-sm p-8 max-w-md">
           <h1 className="mb-4 text-2xl font-bold text-brand-title">
             {message}
           </h1>
-          <p className="mb-4 text-brand-text">
+          <p className="mb-6 text-brand-text">
             El vehículo que buscas no existe o no se pudo cargar.
           </p>
           <Link
             to="/vehiculos"
-            className="inline-flex items-center rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-title hover:bg-brand-secondary focus:outline-none focus:ring-2 focus:ring-brand-highlight focus:ring-offset-2"
+            className="inline-flex items-center rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-brand-title hover:bg-brand-highlight focus:outline-none focus:ring-2 focus:ring-brand-highlight focus:ring-offset-2 transition-colors"
           >
             Volver a la lista de vehículos
           </Link>
@@ -329,13 +329,13 @@ export default function VehiculoDetallePage() {
   const vehiculoInfo = `${vehiculo.marca || ''} ${vehiculo.modelo || ''}`.trim() || 'Sin información';
 
   return (
-    <div className="container mx-auto px-4 py-8 font-sans bg-brand-bg min-h-screen rounded-[15px]">
+    <div className="min-h-screen bg-brand-bg flex flex-col gap-6 p-4 md:p-8">
       {/* Header con navegación */}
-      <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-2">
+        <div className="flex items-center gap-4">
           <Link
             to="/vehiculos"
-            className="inline-flex items-center text-sm text-brand-highlight hover:text-brand-primary mb-2"
+            className="inline-flex items-center text-sm text-brand-highlight hover:text-brand-primary transition-colors"
           >
             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -345,22 +345,67 @@ export default function VehiculoDetallePage() {
           <h1 className="text-3xl font-bold text-brand-title">
             {vehiculo.marca} {vehiculo.modelo}
           </h1>
+          <span className="inline-block bg-brand-primary text-white text-sm font-semibold rounded-full px-3 py-1">
+            {vehiculo.anio || 'N/A'}
+          </span>
         </div>
-        <div className="flex gap-3">
-          <button
-            onClick={() => setIsDeleteModalOpen(true)}
-            className="inline-flex items-center rounded-lg border border-brand-secondary bg-white px-4 py-2 text-sm font-medium text-brand-text shadow-sm hover:bg-brand-bg focus:outline-none focus:ring-2 focus:ring-brand-highlight focus:ring-offset-2"
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+        <button
+          onClick={() => setIsDeleteModalOpen(true)}
+          className="inline-flex items-center gap-2 rounded-lg bg-red-600 text-white font-semibold px-4 py-2 shadow-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition w-full sm:w-auto text-base sm:text-base"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          Eliminar Vehículo
+        </button>
+      </div>
+
+      {/* Tarjetas de Métricas */}
+      <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 sm:grid sm:grid-cols-4 sm:gap-4 sm:overflow-visible sm:pb-0 sm:mx-0">
+        <div className="bg-white rounded-lg shadow-md p-3 min-w-[170px] flex flex-col items-start justify-center sm:p-6">
+          <span className="text-xs text-brand-text font-semibold mb-1">Precio</span>
+          <span className="text-lg font-bold text-brand-title">{formatPrice(vehiculo.precio)}</span>
+          <span className="flex items-center text-green-600 text-xs mt-0.5">
+            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12l5 5L20 7" />
             </svg>
-            Eliminar
-          </button>
+            Disponible
+          </span>
+        </div>
+        <div className="bg-white rounded-lg shadow-md p-3 min-w-[170px] flex flex-col items-start justify-center sm:p-6">
+          <span className="text-xs text-brand-text font-semibold mb-1">Kilometraje</span>
+          <span className="text-lg font-bold text-brand-title">{formatMileage(vehiculo.km)}</span>
+          <span className="flex items-center text-blue-600 text-xs mt-0.5">
+            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {vehiculo.transmision || 'N/A'}
+          </span>
+        </div>
+        <div className="bg-white rounded-lg shadow-md p-3 min-w-[170px] flex flex-col items-start justify-center sm:p-6">
+          <span className="text-xs text-brand-text font-semibold mb-1">Combustible</span>
+          <span className="text-lg font-bold text-brand-title">{vehiculo.combustible || 'N/A'}</span>
+          <span className="flex items-center text-purple-600 text-xs mt-0.5">
+            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            {vehiculo.color || 'N/A'}
+          </span>
+        </div>
+        <div className="bg-white rounded-lg shadow-md p-3 min-w-[170px] flex flex-col items-start justify-center sm:p-6">
+          <span className="text-xs text-brand-text font-semibold mb-1">Cuota Mensual</span>
+          <span className="text-lg font-bold text-brand-title">{calculateMonthlyPayment(vehiculo.precio)}</span>
+          <span className="flex items-center text-orange-600 text-xs mt-0.5">
+            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+            </svg>
+            Estimada
+          </span>
         </div>
       </div>
 
       {/* Contenido principal */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Columna principal - Imagen */}
         <div className="lg:col-span-2">
           {/* Galería de imágenes */}
@@ -370,7 +415,7 @@ export default function VehiculoDetallePage() {
         {/* Sidebar - Resumen y acciones */}
         <div className="space-y-6">
           {/* Resumen del vehículo */}
-          <div className="bg-white rounded-xl border border-brand-secondary shadow-md p-6 h-96 flex flex-col justify-between">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
             <div className="space-y-4">
               {/* Información principal */}
               <div className="text-center">
@@ -381,7 +426,7 @@ export default function VehiculoDetallePage() {
               </div>
 
               {/* Precio */}
-              <div className="text-center pt-4 border-t border-brand-secondary">
+              <div className="text-center pt-4 border-t border-gray-200">
                 <p className="text-sm text-brand-text">Precio</p>
                 <p className="text-2xl font-bold text-brand-primary">
                   {formatPrice(vehiculo.precio)}
@@ -393,8 +438,8 @@ export default function VehiculoDetallePage() {
             </div>
 
             {/* Botones de acción */}
-            <div className="space-y-3">
-              <button className="w-full bg-brand-primary text-brand-title font-semibold py-3 px-4 rounded-lg hover:bg-brand-secondary transition-colors duration-200">
+            <div className="space-y-3 mt-6">
+              <button className="w-full bg-brand-primary text-brand-title font-semibold py-3 px-4 rounded-lg hover:bg-brand-highlight transition-colors duration-200">
                 Sepárelo
               </button>
               <button className="w-full bg-brand-secondary text-brand-title font-semibold py-3 px-4 rounded-lg hover:bg-brand-primary transition-colors duration-200">
@@ -417,7 +462,7 @@ export default function VehiculoDetallePage() {
       </div>
 
       {/* Características detalladas - Ancho completo */}
-      <div className="mt-8 bg-white rounded-xl border border-brand-secondary shadow-md p-6">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
         <h2 className="text-xl font-bold text-brand-title mb-6">Características del Vehículo</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Año */}
@@ -568,7 +613,7 @@ export default function VehiculoDetallePage() {
       </div>
 
       {/* Formulario de Edición - Ancho completo */}
-      <div className="mt-8 bg-white rounded-xl border border-brand-secondary shadow-md p-6">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
         <h2 className="text-xl font-bold text-brand-title mb-6">Editar Vehículo</h2>
 
         <Form method="post" className="space-y-6">
@@ -591,7 +636,7 @@ export default function VehiculoDetallePage() {
                 name="marca"
                 id="marca"
                 defaultValue={vehiculo.marca || ""}
-                className="mt-1 block w-full rounded-lg border border-brand-secondary px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary bg-white text-brand-title"
+                className="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary bg-white text-brand-title"
               />
               {actionData?.errors?.marca && (
                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">
@@ -612,7 +657,7 @@ export default function VehiculoDetallePage() {
                 name="modelo"
                 id="modelo"
                 defaultValue={vehiculo.modelo || ""}
-                className="mt-1 block w-full rounded-lg border border-brand-secondary px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary bg-white text-brand-title"
+                className="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary bg-white text-brand-title"
               />
               {actionData?.errors?.modelo && (
                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">
@@ -633,7 +678,7 @@ export default function VehiculoDetallePage() {
                 name="anio"
                 id="anio"
                 defaultValue={vehiculo.anio || ""}
-                className="mt-1 block w-full rounded-lg border border-brand-secondary px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary bg-white text-brand-title"
+                className="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary bg-white text-brand-title"
               />
               {actionData?.errors?.anio && (
                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">
@@ -654,7 +699,7 @@ export default function VehiculoDetallePage() {
                 name="km"
                 id="km"
                 defaultValue={vehiculo.km || ""}
-                className="mt-1 block w-full rounded-lg border border-brand-secondary px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary bg-white text-brand-title"
+                className="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary bg-white text-brand-title"
               />
               {actionData?.errors?.km && (
                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">
@@ -675,7 +720,7 @@ export default function VehiculoDetallePage() {
                 name="precio"
                 id="precio"
                 defaultValue={vehiculo.precio || ""}
-                className="mt-1 block w-full rounded-lg border border-brand-secondary px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary bg-white text-brand-title"
+                className="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary bg-white text-brand-title"
               />
               {actionData?.errors?.precio && (
                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">
@@ -695,7 +740,7 @@ export default function VehiculoDetallePage() {
                 name="transmision"
                 id="transmision"
                 defaultValue={vehiculo.transmision || ""}
-                className="mt-1 block w-full rounded-lg border border-brand-secondary px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary bg-white text-brand-title"
+                className="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary bg-white text-brand-title"
               >
                 <option value="">Seleccione...</option>
                 <option value="Manual">Manual</option>
@@ -713,7 +758,7 @@ export default function VehiculoDetallePage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="inline-flex justify-center rounded-lg border border-transparent bg-brand-primary px-4 py-2 text-sm font-medium text-brand-title shadow-sm hover:bg-brand-secondary focus:outline-none focus:ring-2 focus:ring-brand-highlight focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors duration-200"
+              className="inline-flex justify-center rounded-lg border border-transparent bg-brand-primary px-4 py-2 text-sm font-medium text-brand-title shadow-sm hover:bg-brand-highlight focus:outline-none focus:ring-2 focus:ring-brand-highlight focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors duration-200"
             >
               {isSubmitting ? "Guardando..." : "Guardar Cambios"}
             </button>

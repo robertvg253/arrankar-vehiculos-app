@@ -1,8 +1,16 @@
 import { NavLink } from "@remix-run/react";
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 export default function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
+  const [hasSession, setHasSession] = useState(false);
+
+  useEffect(() => {
+    // Detecta si hay sesión leyendo la cookie (simple, no seguro, pero suficiente para navegación UI)
+    setHasSession(document.cookie.includes("concesionario_id"));
+  }, []);
+
+  const dashboardTo = useMemo(() => (hasSession ? "/dashboard" : "/login"), [hasSession]);
 
   return (
     <>
@@ -39,17 +47,43 @@ export default function Sidebar() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 transform flex-col bg-sidebar-bg transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 shadow-lg ${
+        className={`fixed inset-y-0 left-0 z-40 w-64 transform flex-col bg-white border-r border-gray-200 shadow-md transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 font-sans ${
           isOpen ? "translate-x-0" : "-translate-x-full"
-        } font-sans`}
+        }`}
       >
         {/* Logo and Title */}
-        <div className="flex h-16 items-center justify-center border-b border-gray-200 px-6">
+        <div className="flex h-16 items-center justify-center px-6">
           <img src="/images/logo-arrankar.png" alt="Arrankar Logo" className="h-12" />
         </div>
 
         {/* Navigation */}
         <nav className="flex-1 space-y-1 p-4">
+          <NavLink
+            to={dashboardTo}
+            className={({ isActive }) =>
+              `flex items-center rounded-lg px-4 py-2 text-sm font-medium transition-colors font-sans ` +
+              (isActive
+                ? "bg-brand-primary text-brand-title"
+                : "text-brand-text hover:bg-brand-secondary hover:text-brand-title")
+            }
+            onClick={() => setIsOpen(false)}
+          >
+            <svg
+              className="mr-3 h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0h6"
+              />
+            </svg>
+            Panel
+          </NavLink>
           <NavLink
             to="/vehiculos"
             className={({ isActive }) =>
