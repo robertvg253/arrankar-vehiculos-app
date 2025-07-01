@@ -4,6 +4,7 @@ import type { LoaderFunction, ActionFunction } from "@remix-run/node";
 import { supabase } from "~/utils/supabase.server";
 import { useState, useEffect } from "react";
 import ImageGallery, { type ImageGalleryImage } from "~/components/ImageGallery";
+import FormularioContactoVehiculo from "~/components/FormularioContactoVehiculo";
 
 type Vehiculo = {
   uuid: string;
@@ -76,19 +77,73 @@ export const loader: LoaderFunction = async ({ params }) => {
   if (imagesError) {
     console.error("Error al cargar imágenes:", imagesError);
     // Devuelve el vehículo pero con un array de imágenes vacío en caso de error
-    return json({ vehiculo, images: [] });
+    return json({ vehiculo, images: [], pdfs: [] });
   }
 
   // Ordenar imágenes por 'order_index' numéricamente
   const images: ImageGalleryImage[] = (imagesData || [])
     .sort((a, b) => parseInt(a.order_index, 10) - parseInt(b.order_index, 10));
 
-  return json({ vehiculo, images });
+  // Obtener PDFs asociados desde la tabla documentos_vehiculo
+  const { data: pdfsData, error: pdfsError } = await supabase
+    .from("documentos_vehiculo")
+    .select("id, nombre_archivo, url_documento, tipo_documento, uploaded_at")
+    .eq("vehiculo_uuid", vehiculoId);
+
+  if (pdfsError) {
+    console.error("Error al cargar PDFs:", pdfsError);
+    return json({ vehiculo, images, pdfs: [] });
+  }
+
+  return json({ vehiculo, images, pdfs: pdfsData || [] });
 };
 
 export const action: ActionFunction = async ({ request, params }) => {
   const formData = await request.formData();
   const method = formData.get("_method") as string;
+
+  // --- NUEVO: Manejo de formulario de contacto ---
+  const nombre = formData.get("nombre") as string | null;
+  const email = formData.get("email") as string | null;
+  const mensaje = formData.get("mensaje") as string | null;
+  const vehiculo_uuid = formData.get("vehiculo_uuid") as string | null;
+
+  // Si vienen los campos del formulario de contacto, procesar esa lógica
+  if (nombre !== null && email !== null && mensaje !== null && vehiculo_uuid !== null) {
+    const errors: Record<string, string> = {};
+    if (!nombre.trim()) errors.nombre = "Por favor, introduce tu nombre.";
+    if (!email.trim()) {
+      errors.email = "Por favor, introduce tu correo electrónico.";
+    } else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      errors.email = "El correo electrónico no es válido.";
+    }
+    if (!mensaje.trim()) errors.mensaje = "El mensaje no puede estar vacío.";
+    if (!vehiculo_uuid) errors.form = "Falta el identificador del vehículo.";
+
+    if (Object.keys(errors).length > 0) {
+      return json({ errors });
+    }
+
+    // Insertar en la tabla solicitud_contacto
+    const { error } = await supabase
+      .from("solicitud_contacto")
+      .insert([
+        {
+          nombre,
+          email,
+          mensaje,
+          vehiculo_uuid,
+        },
+      ]);
+
+    if (error) {
+      console.error("Error al guardar solicitud de contacto:", error);
+      return json({ errors: { form: "Ocurrió un error al enviar tu solicitud. Por favor, inténtalo de nuevo más tarde." } });
+    }
+
+    return json({ success: "¡Tu solicitud ha sido enviada con éxito! Te contactaremos pronto." });
+  }
+  // --- FIN NUEVO ---
 
   if (method === "delete") {
     const vehiculoId = params.vehiculoId;
@@ -264,7 +319,7 @@ function DeleteModal({
 }
 
 export default function VehiculoDetallePage() {
-  const { vehiculo, message, images = [] } = useLoaderData<{ vehiculo?: Vehiculo; message?: string; images?: ImageGalleryImage[] }>();
+  const { vehiculo, message, images = [], pdfs = [] } = useLoaderData<{ vehiculo?: Vehiculo; message?: string; images?: ImageGalleryImage[]; pdfs?: any[] }>();
   const actionData = useActionData<ActionData>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
@@ -331,33 +386,56 @@ export default function VehiculoDetallePage() {
   return (
     <div className="min-h-screen bg-brand-bg flex flex-col gap-6 p-4 md:p-8">
       {/* Header con navegación */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-2">
-        <div className="flex items-center gap-4">
-          <Link
-            to="/vehiculos"
-            className="inline-flex items-center text-sm text-brand-highlight hover:text-brand-primary transition-colors"
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Volver a vehículos
-          </Link>
-          <h1 className="text-3xl font-bold text-brand-title">
+      <div className="mb-2">
+        {/* Mobile: Botón regresar y año en fila, nombre debajo */}
+        <div className="flex flex-col gap-2 md:hidden">
+          <div className="flex items-center gap-2 w-full">
+            <Link
+              to="/vehiculos"
+              className="inline-flex items-center text-sm text-brand-highlight hover:text-brand-primary transition-colors"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Volver a vehículos
+            </Link>
+            <span className="inline-block bg-brand-primary text-white text-xs font-semibold rounded-full px-3 py-1 ml-auto">
+              {vehiculo.anio || 'N/A'}
+            </span>
+          </div>
+          <h1 className="text-2xl font-bold text-brand-title w-full text-left">
             {vehiculo.marca} {vehiculo.modelo}
           </h1>
-          <span className="inline-block bg-brand-primary text-white text-sm font-semibold rounded-full px-3 py-1">
-            {vehiculo.anio || 'N/A'}
-          </span>
         </div>
-        <button
-          onClick={() => setIsDeleteModalOpen(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-red-600 text-white font-semibold px-4 py-2 shadow-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition w-full sm:w-auto text-base sm:text-base"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-          Eliminar Vehículo
-        </button>
+        {/* Desktop: Todo en una fila */}
+        <div className="hidden md:flex items-center gap-4 justify-between">
+          <div className="flex items-center gap-4">
+            <Link
+              to="/vehiculos"
+              className="inline-flex items-center text-sm text-brand-highlight hover:text-brand-primary transition-colors"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Volver a vehículos
+            </Link>
+            <h1 className="text-3xl font-bold text-brand-title">
+              {vehiculo.marca} {vehiculo.modelo}
+            </h1>
+            <span className="inline-block bg-brand-primary text-white text-sm font-semibold rounded-full px-3 py-1">
+              {vehiculo.anio || 'N/A'}
+            </span>
+          </div>
+          <button
+            onClick={() => setIsDeleteModalOpen(true)}
+            className="inline-flex items-center gap-2 rounded-lg bg-red-600 text-white font-semibold px-4 py-2 shadow-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition w-full sm:w-auto text-base sm:text-base"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Eliminar Vehículo
+          </button>
+        </div>
       </div>
 
       {/* Tarjetas de Métricas */}
@@ -414,48 +492,27 @@ export default function VehiculoDetallePage() {
 
         {/* Sidebar - Resumen y acciones */}
         <div className="space-y-6">
-          {/* Resumen del vehículo */}
+          {/* Resumen del vehículo y formulario de contacto */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-            <div className="space-y-4">
+            <div className="space-y-2">
               {/* Información principal */}
               <div className="text-center">
-                <h3 className="text-lg font-bold text-brand-title">
+                <h3 className="text-base font-semibold text-brand-title">
                   {vehiculo.marca} {vehiculo.modelo}
                 </h3>
-                <p className="text-sm text-brand-text">{vehiculo.anio} • {vehiculo.transmision}</p>
+                <p className="text-xs text-brand-text">{vehiculo.anio} • {vehiculo.transmision}</p>
               </div>
-
-              {/* Precio */}
-              <div className="text-center pt-4 border-t border-gray-200">
-                <p className="text-sm text-brand-text">Precio</p>
-                <p className="text-2xl font-bold text-brand-primary">
+              {/* Precio pequeño */}
+              <div className="text-center pt-2">
+                <p className="text-xs text-brand-text">Precio</p>
+                <p className="text-lg font-bold text-brand-primary">
                   {formatPrice(vehiculo.precio)}
-                </p>
-                <p className="text-xs text-brand-text mt-1">
-                  Cuota desde {calculateMonthlyPayment(vehiculo.precio)}/mes
                 </p>
               </div>
             </div>
-
-            {/* Botones de acción */}
-            <div className="space-y-3 mt-6">
-              <button className="w-full bg-brand-primary text-brand-title font-semibold py-3 px-4 rounded-lg hover:bg-brand-highlight transition-colors duration-200">
-                Sepárelo
-              </button>
-              <button className="w-full bg-brand-secondary text-brand-title font-semibold py-3 px-4 rounded-lg hover:bg-brand-primary transition-colors duration-200">
-                Llévalo a Crédito
-              </button>
-              <a
-                href={`https://wa.me/573001234567?text=Hola, estoy interesado en el ${vehiculo.marca} ${vehiculo.modelo} ${vehiculo.anio}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full bg-green-600 text-white font-semibold py-3 px-4 rounded-lg hover:bg-green-700 transition-colors duration-200 flex items-center justify-center"
-              >
-                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488"/>
-                </svg>
-                WhatsApp
-              </a>
+            {/* Formulario de contacto */}
+            <div className="mt-6">
+              <FormularioContactoVehiculo vehiculo_uuid={vehiculo.uuid} />
             </div>
           </div>
         </div>
@@ -611,6 +668,34 @@ export default function VehiculoDetallePage() {
           </div>
         </div>
       </div>
+
+      {/* Documentos PDF adjuntos */}
+      {pdfs && pdfs.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mt-6">
+          <h2 className="text-lg font-bold text-brand-title mb-4 flex items-center gap-2">
+            <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            Documentos Adjuntos
+          </h2>
+          <div className="flex flex-wrap gap-4">
+            {pdfs.map((pdf) => (
+              <a
+                key={pdf.id}
+                href={pdf.url_documento}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 bg-gray-50 hover:bg-brand-primary-light border border-gray-200 rounded-lg px-4 py-3 shadow transition cursor-pointer min-w-[220px] max-w-xs w-full"
+                title={pdf.nombre_archivo}
+              >
+                <svg className="w-7 h-7 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M19.5 6.75v10.5A2.25 2.25 0 0 1 17.25 19.5h-10.5A2.25 2.25 0 0 1 4.5 17.25V6.75A2.25 2.25 0 0 1 6.75 4.5h7.5a.75.75 0 0 1 .53.22l4.5 4.5a.75.75 0 0 1 .22.53zM12 15.75a.75.75 0 0 0 .75-.75v-3a.75.75 0 0 0-1.5 0v3a.75.75 0 0 0 .75.75zm0-6a.75.75 0 0 0-.75.75v.5a.75.75 0 0 0 1.5 0v-.5A.75.75 0 0 0 12 9.75z"/></svg>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-brand-title text-sm truncate">{pdf.nombre_archivo}</div>
+                  <div className="text-xs text-gray-500 truncate">PDF adjunto</div>
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Formulario de Edición - Ancho completo */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">

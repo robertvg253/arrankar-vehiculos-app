@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   json,
   type LoaderFunctionArgs,
@@ -12,6 +12,7 @@ import { supabase } from "~/utils/supabase.server";
 import { getSession } from "~/utils/session.server";
 import ImageUploader, { type ImageUploaderChanges, type ImageMetadata } from "../components/ImageUploader";
 import LoadingToast from "../components/LoadingToast";
+import PdfUploader from "~/components/pdfUploader";
 
 // Cache simple en memoria para datos que no cambian frecuentemente
 const cache = {
@@ -313,64 +314,69 @@ export async function action({ request }: ActionFunctionArgs) {
     const imageUploadPromises = orderedImagesMetadata
       .filter((meta) => meta.isNew)
       .map(async (meta) => {
-        console.log("Procesando imagen nueva:", meta);
-        const file = formData.get(meta.storage_id) as File;
-        console.log("Archivo encontrado:", file ? "SÍ" : "NO", file?.name);
-        if (!file || !(file instanceof File)) {
-          console.log("Archivo inválido, saltando...");
-          return;
+        try {
+          console.log("Procesando imagen nueva:", meta);
+          const file = formData.get(meta.storage_id) as File;
+          if (!file || !(file instanceof File)) {
+            console.error("Archivo no encontrado o inválido para storage_id:", meta.storage_id);
+            return;
+          }
+
+          // Usar el id (entero) del vehículo para la carpeta y para id_v
+          const carpetaId = vehicleId; // id entero
+          const filePath = `${carpetaId}/${meta.storage_id}`;
+          console.log("Subiendo a path:", filePath, "(carpetaId:", carpetaId, ", storage_id:", meta.storage_id, ")");
+
+          // Verificar que el bucket existe antes de subir
+          const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
+          if (bucketsError) {
+            console.error("Error listando buckets:", bucketsError);
+            throw bucketsError;
+          }
+
+          const bucketExists = buckets?.some(bucket => bucket.name === 'imagen-vehiculo');
+          if (!bucketExists) {
+            console.error("Bucket 'imagen-vehiculo' no existe. Buckets disponibles:", buckets?.map(b => b.name));
+            throw new Error("Bucket 'imagen-vehiculo' no existe. Por favor, créalo en Supabase Storage.");
+          }
+
+          console.log("Bucket 'imagen-vehiculo' existe. Intentando subir archivo...");
+
+          const { error: uploadError } = await supabase.storage
+            .from('imagen-vehiculo')
+            .upload(filePath, file, { cacheControl: '3600', upsert: false });
+
+          if (uploadError) {
+            console.error("Error subiendo archivo:", uploadError);
+            throw uploadError;
+          }
+
+          console.log("Archivo subido exitosamente");
+
+          const { data: urlData } = supabase.storage.from('imagen-vehiculo').getPublicUrl(filePath);
+          console.log("URL pública generada:", urlData.publicUrl);
+
+          // Insertar en la tabla images usando vehicle_id = uuid y id_v = id entero
+          const insertResult = await supabase.from('images').insert({
+            vehicle_id: vehicleUuid, // uuid del vehículo
+            id_v: String(carpetaId), // id entero del vehículo
+            url: urlData.publicUrl,
+            order_index: String(meta.order_index),
+            storage_id: meta.storage_id,
+            destacada: meta.destacada ? 'true' : 'false',
+          });
+
+          if (insertResult.error) {
+            console.error("Error insertando en BD images:", insertResult.error);
+            throw insertResult.error;
+          }
+
+          console.log("Resultado inserción en BD images:", insertResult);
+          return insertResult;
+        } catch (err) {
+          console.error("Error en el procesamiento de imagen nueva:", err);
+          throw err;
         }
-
-        // El path debe usar el id numérico (vehicleId) para coincidir con el storage
-        const filePath = `${vehicleId}/${meta.storage_id}`; // vehicleId es int8, así se ve en el bucket
-        console.log("Subiendo a path:", filePath, "(vehicleId:", vehicleId, ", storage_id:", meta.storage_id, ")");
-        
-        // Verificar que el bucket existe antes de subir
-        const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
-        if (bucketsError) {
-          console.error("Error listando buckets:", bucketsError);
-          throw bucketsError;
-        }
-        
-        const bucketExists = buckets?.some(bucket => bucket.name === 'imagen-vehiculo');
-        if (!bucketExists) {
-          console.error("Bucket 'imagen-vehiculo' no existe. Buckets disponibles:", buckets?.map(b => b.name));
-          throw new Error("Bucket 'imagen-vehiculo' no existe. Por favor, créalo en Supabase Storage.");
-        }
-        
-        console.log("Bucket 'imagen-vehiculo' existe. Intentando subir archivo...");
-        
-        const { error: uploadError } = await supabase.storage
-          .from('imagen-vehiculo')
-          .upload(filePath, file, { cacheControl: '3600', upsert: false });
-        
-        if (uploadError) {
-          console.error("Error subiendo archivo:", uploadError);
-          throw uploadError;
-        }
-
-        console.log("Archivo subido exitosamente");
-
-        const { data: urlData } = supabase.storage.from('imagen-vehiculo').getPublicUrl(filePath);
-        console.log("URL pública generada:", urlData.publicUrl);
-
-        // Insertar en la tabla images usando vehicle_id = vehicleUuid
-        const insertResult = await supabase.from('images').insert({
-          vehicle_id: vehicleUuid, // <-- usar uuid del vehículo
-          url: urlData.publicUrl,
-          order_index: String(meta.order_index),
-          storage_id: meta.storage_id,
-          destacada: meta.destacada ? 'true' : 'false',
-          id_v: String(vehicleId), // opcional, solo referencia
-        });
-
-        if (insertResult.error) {
-          console.error("Error insertando en BD images:", insertResult.error);
-          throw insertResult.error;
-        }
-
-        console.log("Resultado inserción en BD images:", insertResult);
-        return insertResult;
       });
 
     // 3. Actualizar orden y estado 'destacada' de imágenes existentes
@@ -449,6 +455,62 @@ export async function action({ request }: ActionFunctionArgs) {
       }
     } else {
       console.log("[vehiculos.nuevo.tsx - action] No se encontró imagen destacada, url_img permanece sin cambios");
+    }
+
+    // LOG: IDs del vehículo
+    console.log("[PDF] vehicleId (BIGINT):", vehicleId);
+    console.log("[PDF] vehicleUuid (UUID):", vehicleUuid);
+
+    // 2b. Procesar PDFs subidos
+    const pdfFiles = formData.getAll('documentosPdf');
+    console.log("[PDF] Archivos recibidos:", pdfFiles);
+    const pdfUploadResults = [];
+    for (const file of pdfFiles) {
+      if (!(file instanceof File) || file.size === 0) {
+        console.warn('[PDF] Archivo ignorado (no File o vacío):', file);
+        continue;
+      }
+      console.log(`[PDF] Procesando archivo: ${file.name}, type: ${file.type}, size: ${file.size}`);
+      if (file.type !== 'application/pdf') {
+        console.warn('[PDF] Archivo ignorado por no ser PDF:', file.name, file.type);
+        continue;
+      }
+      try {
+        // Usar un nombre único para evitar colisiones
+        const uniqueName = `${crypto.randomUUID()}_${file.name}`;
+        const pdfPath = `${vehicleId}/${uniqueName}`;
+        console.log(`[PDF] Subiendo a: documentos-vehiculos/${pdfPath}`);
+        // Subir al bucket documentos-vehiculos
+        const { error: pdfUploadError } = await supabase.storage
+          .from('documentos-vehiculos')
+          .upload(pdfPath, file, { cacheControl: '3600', upsert: false });
+        if (pdfUploadError) {
+          console.error('[PDF] Error subiendo PDF:', pdfUploadError);
+          pdfUploadResults.push({ file: file.name, error: pdfUploadError.message });
+          continue;
+        }
+        // Obtener URL pública
+        const { data: pdfUrlData } = supabase.storage.from('documentos-vehiculos').getPublicUrl(pdfPath);
+        console.log(`[PDF] URL pública generada:`, pdfUrlData.publicUrl);
+        // Insertar en la tabla documentos_vehiculo
+        const { error: dbError } = await supabase.from('documentos_vehiculo').insert({
+          vehiculo_uuid: vehicleUuid,
+          id_v: vehicleId,
+          nombre_archivo: file.name,
+          url_documento: pdfUrlData.publicUrl,
+          tipo_documento: 'general',
+        });
+        if (dbError) {
+          console.error('[PDF] Error insertando en documentos_vehiculo:', dbError);
+          pdfUploadResults.push({ file: file.name, error: dbError.message });
+        } else {
+          console.log(`[PDF] Registro insertado en documentos_vehiculo para: ${file.name}`);
+          pdfUploadResults.push({ file: file.name, success: true });
+        }
+      } catch (err) {
+        console.error('[PDF] Error inesperado subiendo PDF:', err);
+        pdfUploadResults.push({ file: file.name, error: String(err) });
+      }
     }
 
     console.log("[vehiculos.nuevo.tsx - action] Action finished successfully, redirecting...");
@@ -566,13 +628,12 @@ export default function NuevoVehiculo() {
   const opcionesCarroceria = ["Camioneta", "Sedan", "Hatchback", "Coupe", "Pick Up", "SUV"];
   const opcionesTraccion = ["4x2", "4x4", "4X3"];
 
+  const pdfInputRef = useRef<HTMLInputElement>(null);
+
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!imageUploaderData) return;
-
-    // Mostrar el toast de loading
     setShowLoadingToast(true);
-
     const formData = new FormData();
     
     // Añadir datos del Paso 1
@@ -599,6 +660,13 @@ export default function NuevoVehiculo() {
 
     for (const [storage_id, file] of imageUploaderData.filesToUpload.entries()) {
       formData.append(storage_id, file);
+    }
+    
+    // Agregar PDFs seleccionados
+    if (pdfInputRef.current && pdfInputRef.current.files) {
+      for (const file of Array.from(pdfInputRef.current.files)) {
+        formData.append("documentosPdf", file);
+      }
     }
     
     submit(formData, { method: "post", encType: "multipart/form-data", replace: true });
@@ -840,6 +908,10 @@ export default function NuevoVehiculo() {
           <section className="mb-8">
             <h2 className="text-xl font-semibold text-brand-title mb-2">Paso 3: Detalles Adicionales y Contacto</h2>
             <ImageUploader onImagesChange={handleImagesChange} />
+            {/* PDF Uploader */}
+            <div className="mt-6">
+              <PdfUploader inputRef={pdfInputRef} />
+            </div>
             <div className="mt-8 flex justify-between">
               <button
                 type="button"
