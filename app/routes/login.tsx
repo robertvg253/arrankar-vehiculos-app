@@ -21,6 +21,13 @@ export async function action({ request }: ActionFunctionArgs) {
   // Autenticación con Supabase
   const { data, error } = await supabase.auth.signInWithPassword({ email: String(email), password: String(password) });
   if (error || !data.user) {
+    // Detectar error de usuario no encontrado
+    if (error?.message && error.message.toLowerCase().includes("invalid login credentials")) {
+      // Redirigir a /register con el email como parámetro
+      const params = new URLSearchParams({ email: String(email) });
+      return redirect(`/register?${params.toString()}`);
+    }
+    // Otros errores
     return json({ error: error?.message || "Credenciales inválidas" }, { status: 401 });
   }
   // Buscar usuario en public.users
@@ -87,6 +94,20 @@ export default function LoginPage() {
             Ingresar
           </button>
         </Form>
+        <div className="text-center mt-4">
+          <a
+            href="#"
+            className="text-brand-highlight hover:underline text-sm"
+            onClick={e => {
+              e.preventDefault();
+              const emailInput = document.getElementById('email') as HTMLInputElement | null;
+              const email = emailInput?.value || '';
+              window.location.href = `/register${email ? `?email=${encodeURIComponent(email)}` : ''}`;
+            }}
+          >
+            ¿No tienes cuenta? Regístrate
+          </a>
+        </div>
       </div>
     </div>
   );
