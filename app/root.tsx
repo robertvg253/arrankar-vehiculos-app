@@ -53,6 +53,7 @@ export default function App() {
   const location = useLocation();
   const isLogin = location.pathname === "/login";
   const isRegister = location.pathname === "/register";
+  const isCompletarPerfil = location.pathname === "/completar-perfil";
   return (
     <html lang="es" className="h-full font-sans" style={{ fontFamily: 'Poppins, sans-serif' }}>
       <head>
@@ -62,7 +63,7 @@ export default function App() {
         <Links />
       </head>
       <body className="h-full bg-white text-brand-text font-sans" style={{ fontFamily: 'Poppins, sans-serif' }}>
-        {(isLogin || isRegister) ? (
+        {(isLogin || isRegister || isCompletarPerfil) ? (
           <main className="flex-1 overflow-y-auto bg-white p-4 pt-16 lg:p-8 lg:pt-8">
             <Outlet />
           </main>
